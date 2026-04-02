@@ -1,0 +1,143 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@1,100&family=Roboto:wght@100&display=swap');
+
+.font {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+.table-container {
+    overflow-x: auto;
+    width: 100%;
+    margin: 20px 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+    /* white-space: nowrap; */
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: left;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+}
+
+th {
+    background-color: #f2f2f2;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+}
+td{
+    font-weight: 400 ;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+th{
+    width: auto !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+}
+@media screen and (max-width: 768px) {
+    .exam-upper-div{
+        /* border: 1px solid #000; */
+    }
+
+    .onlineExamination{
+        padding: 0 !important;
+    }
+
+    .exam-upper-map{
+        font-size: 11px;
+        height: auto !important;
+    }
+
+    .exam-upper-text{
+        font-size: 10px;
+    }
+
+    .exam-upper-val{
+        font-size: 10px;
+    }
+
+    .exam-icon{
+        display: none;
+
+    }
+    .text-sm-q{
+        font-size: 12px;
+        /* font-weight: 400; */
+    }
+
+    .text-sm{
+        font-size: 12px;
+        font-weight: 400;
+    }
+
+    .btn-div{
+        gap: 5px !important;
+        height: auto !important;
+        margin-top: 10px !important;
+        width: auto!important;
+    }
+
+    .btn{
+        padding: 5px !important;
+
+        font-size: 10px;
+        margin: 0 !important;
+        width: auto !important;
+    }
+
+    
+.table-container {
+    overflow-x: auto;
+    width: 100% !important;
+    margin: 1px 0;
+    border: 1px solid #000;
+}
+
+.heading-exam{
+    font-size: large;
+    font-weight: 400;
+}
+
+.forWhitCOlor{
+    padding: 0px !important;
+    box-shadow: none !important;
+    width: 100% !important;
+}
+
+.forbox{
+    padding: 0px !important;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 10px;
+
+    /* white-space: nowrap; */
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 1px;
+    text-align: center;
+    font-size: 10px;
+
+}
+
+    th {
+        background-color: #f2f2f2;
+        font-size: 10px;
+    }
+    th{
+        width: 57px !important;
+        font-size: 10px;
+
+    }
+}

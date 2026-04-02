@@ -1,0 +1,203 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100&display=swap');
+.font {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+
+
+
+.otp{
+    display: flex;
+    flex-direction: column;
+    margin-top: 10px;
+    width: 60%;     
+}
+.inputStyle {
+    width: 50% !important;
+    height: 45px;
+    border-radius: 7px;
+    border: 0px;
+    margin-left: 8px;
+    margin-right: 8px;
+    background: #dddddd;
+    font-size: 20px;
+}
+
+table {
+    font-family: arial, sans-serif;
+    border-collapse: collapse;
+    width: 100%;
+    font-size: large;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+}
+    th{
+        text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+    }
+  
+  td, th {
+    border: 1px solid #adb5bd;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    padding: 8px;
+    
+  }
+  
+
+.inputcheck{
+    width: 20px;
+    height: 20px;
+}
+
+.rightDiv{
+    width: 60%;
+}
+
+.leftDiv{
+    width: 40%;
+    flex: 1;
+}
+
+.right-div-training{
+    gap: 40px;
+    
+    gap: 10px;
+}
+
+
+.icon-right-training{
+    display: flex;
+}
+.btn-div{
+    width: 50%;
+}
+.time-left{
+    display: flex;
+    flex-direction: column;
+    justify-content: end;
+    align-items: end;
+    width: max-content;
+    width: 80px;
+}
+
+@media screen and (max-width: 768px) {
+    .pos-heading{
+        font-size: large;
+        text-align: center;
+    }
+
+    .pos-heading-3{
+        font-size: 20px;
+    }
+
+    .pos-heading-2 {
+        font-size: small;
+    }
+    .btn {
+      width: 100%;
+      padding: 2px;
+    }
+
+    .left-training-div-head{
+        font-size: 15px !important;
+        padding-right: 10px;
+    }
+    .topic-left-div{
+        padding: 0 !important;
+        gap: 0 !important;
+        flex-direction: column;
+    }
+    .time-left{
+        flex-direction: row;
+        gap: 2px;
+    }
+
+    .lt-name{
+        padding-top: 2px;
+        
+    }
+    .left-topic{
+        font-size: 10px !important;
+        padding-left: 6px;
+
+    }
+    .inputcheck{
+        width: 10px;
+        height: 10px;
+        border-radius: 0px;
+
+    }
+    .btn-div{
+        height:auto !important;
+        gap: 0px;
+        padding:  10px;
+    }
+    .btn1{
+        width: 30% !important;
+        padding: 0;
+        margin: 0;
+        
+    }
+    .btn2{
+        width: 30%;
+        padding: 0;
+        margin: 0;
+    }
+    .btn3{
+        width: 30%;
+        padding: 0;
+        margin: 0;
+    }
+    .inputStyle{
+        border:1px solid black;
+        width: 15px;
+         
+    }
+    .leftDiv{
+        width: 50%;
+      
+
+    }
+    .otp{
+        width: 100%;
+        flex-direction: column;
+    }
+
+    table{
+        font-size: 10px;
+    }
+
+    td,th {
+        padding: 3px;
+        font-size: 8px;
+    }
+
+    .rightDiv{
+        width: 100%;
+        flex: 4;
+    }
+
+    .right-div-training{
+        gap: 10px;
+        font-size: 10px;
+        display: flex;
+    }
+    .right-div-training-2{
+        font-size: 12px;
+        height: 50px !important;
+        width: 30% !important;
+        padding: 3px 5px !important;
+        gap: 0px;
+    }
+    .icon-right-training{
+        display: none;
+    }
+
+    .video-div{
+        width: screen;
+        /* height: 100%; */
+        background-color: #fff;
+        height: 50vh !important;
+    }
+}

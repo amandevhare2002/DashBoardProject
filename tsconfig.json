@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    "src/pages/_document.tsx",
+    "src/config/configureStore.js",
+    "src/pages/dashboard/[id].tsx",
+    "src/pages/index.tsx",
+    "src/pages/_app.tsx"
+, "src/app/Layout/Common/MetisMenu/components/MetisMenu.jsx", "src/app/Layout/Common/MetisMenu/containers/Item.js", "src/app/Layout/Common/MetisMenu/index.js", "src/app/Layout/Common/MetisMenu/containers/Item.js", "src/app/Layout/Common/MetisMenu/containers/Item.js", "src/app/Layout/Mailbox/services/base.service.js", "src/app/Layout/Common/MetisMenu/SideBar/item.jsx"  ],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,86 @@
+/* Styles for the left sidebar */
+.hidden {
+    display: none;
+  }
+  
+  .h-full {
+    height: 100%;
+  }
+  
+  .md\:flex {
+    display: flex;
+  }
+  
+  .md\:w-60 {
+    width: 15rem; /* Adjust the width as needed */
+  }
+  
+  .md\:flex-col {
+    flex-direction: column;
+  }
+  
+  .md\:fixed {
+    position: fixed;
+  }
+  
+  .md\:inset-y-0 {
+    top: 0;
+    bottom: 0;
+  }
+  
+  .z-[80] {
+    z-index: 80; /* Adjust the z-index value as needed */
+  }
+  
+  .bg-gray-900 {
+    background-color: #1a202c; /* Adjust the color based on your design */
+  }
+  
+  /* Styles for the left sidebar tabs */
+  .text-sm {
+    font-size: 0.875rem;
+  }
+  
+  .group {
+    position: relative;
+  }
+  
+  .p-3 {
+    padding: 0.75rem;
+  }
+  
+  .w-full {
+    width: 100%;
+  }
+  
+  .justify-start {
+    justify-content: flex-start;
+  }
+  
+  .font-medium {
+    font-weight: 500;
+  }
+  
+  .cursor-pointer {
+    cursor: pointer;
+  }
+  
+  .hover\:text-white:hover {
+    color: #ffffff;
+  }
+  
+  hover-bg-white-10:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  .rounded-lg {
+    border-radius: 0.375rem;
+  }
+  
+  /* Media query for medium screens and larger */
+  @media (min-width: 48em) {
+    .md-ml-64 {
+      margin-left: 16rem;
+    }
+  }
+  

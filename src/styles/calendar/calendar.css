@@ -1,0 +1,32 @@
+main {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.container {
+  position: relative;
+  border: 1px solid black;
+  height: 100vh;
+  width: 90%;
+  overflow: hidden;
+}
+
+.toast-mobile {
+  top: "50px";
+  max-width: "100vw";
+  margin-left: "auto";
+  margin-left: "auto";
+}
+
+@media (max-width: 768px) {
+  .toast-mobile {
+    width: 80%;
+    /* Adjust the width for mobile screens */
+    margin-left: 10%;
+    /* Adjust the left margin for mobile screens */
+    margin-right: 10%;
+    /* Adjust the right margin for mobile screens */
+  }
+}
