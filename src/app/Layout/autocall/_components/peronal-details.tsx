@@ -24,7 +24,6 @@ import { AiFillEdit, AiFillInfoCircle } from "react-icons/ai";
 import Select, { components } from "react-select";
 import CreatableSelect from "react-select/creatable";
 import { ToastContainer, toast } from "react-toastify";
-import "react-toastify/dist/ReactToastify.css";
 import {
   Button,
   Card,
@@ -4919,7 +4918,7 @@ const PersonalDetails = ({
                         </AccordionSummary>
                         <AccordionDetails sx={{ padding: "16px" }}>
                           <div
-                            className="w-full MuiAccordion-root-container"
+                            className="w-full field-container MuiAccordion-root-container"
                             style={{
                               display: "flex",
                               alignItems: "center",
@@ -5658,16 +5657,23 @@ const PersonalDetails = ({
                 ) : updatedPersonalDetails?.[value]?.Nestedtab ===
                   "File Upload" ? (
                   <div
-                    className="w-full"
+                    className="w-full field-container"
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      flexWrap: "wrap",
-                      gap: 20,
                       position: "relative",
-                      height: `${information.Data[0]?.PageHeight}vh`,
+                      minHeight: "100vh",
+                      maxHeight: "calc(100vh - 200px)",
+                      backgroundColor: getCurrentTabBgColor(),
+                      backgroundImage:
+                        pageBackgroundImage || information?.PageBackground
+                          ? `url(${pageBackgroundImage || information?.PageBackground})`
+                          : "none",
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      width: "100%",
+                      overflow: "hidden", // Add this to prevent fields from overflowing visually
                     }}
-                    ref={drop}
+                    ref={isDrag ? drop : containerRef}
                   >
                     <RenderFields
                       updatedPersonalDetails={updatedPersonalDetails}
