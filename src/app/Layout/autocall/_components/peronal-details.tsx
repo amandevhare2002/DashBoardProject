@@ -251,6 +251,24 @@ const PersonalDetails = forwardRef(
       [handleUndo, undoHistory],
     );
 
+    // ✅ KEYBOARD SHORTCUT: Listen for Ctrl+Z (or Cmd+Z on Mac) to trigger undo
+    useEffect(() => {
+      const handleKeyDown = (event: KeyboardEvent) => {
+        // Check for Ctrl+Z (Windows/Linux) or Cmd+Z (Mac)
+        if ((event.ctrlKey || event.metaKey) && event.key === "z") {
+          event.preventDefault();
+          handleUndo();
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+
+      // Cleanup the event listener
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }, [handleUndo]);
+
     const confirm = useConfirm();
     const toggle = (index: number) => {
       const updatedToolTip = [...tooltipOpen];
