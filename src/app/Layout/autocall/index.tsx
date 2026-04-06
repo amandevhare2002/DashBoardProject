@@ -182,6 +182,7 @@ const AutoCallPage = ({
 
   const previousModuleID = useRef<string | null>(null);
   const previousRecordID = useRef<string | null>(null);
+  const personalDetailsRef = useRef<any>(null);
   const onChangeDates = (dates: any) => {
     const [start, end] = dates;
     setStartDate(start);
@@ -2421,6 +2422,49 @@ const AutoCallPage = ({
             </Tooltip>
           );
         }
+      case "Undo":
+        if (response.IsShow) {
+          return (
+            <Tooltip placement="top" overlay={<Label>Undo</Label>}>
+              <Tab
+                sx={{
+                  minWidth: "59px!important",
+                  "& .MuiTab-label": {
+                    fontSize: `${response.FontSize}px`,
+                    fontFamily: response.FontName,
+                    backgroundColor: response.Bgcolor,
+                    color: response.FontColor,
+                    fontWeight: response.IsBold ? "bold" : "normal",
+                    textDecoration: response.Isunderline ? "underline" : "none",
+                    fontStyle: response.Isitalic ? "italic" : "normal",
+                  },
+                }}
+                icon={
+                  hasIcon ? (
+                    <i
+                      className={response.BarButtonCls}
+                      style={{
+                        fontSize: `${response.FontSize}px`,
+                        color: `${response.FontColor}`,
+                        backgroundColor: `${response.Bgcolor}`,
+                        fontWeight: response.IsBold ? "bold" : "normal",
+                      }}
+                    />
+                  ) : undefined
+                }
+                label={getLabel(response, hasIcon)}
+                iconPosition="start"
+                onClick={() => {
+                  setAddLead(false);
+                  setIsModify(false);
+                  if (personalDetailsRef.current?.handleUndo) {
+                    personalDetailsRef.current.handleUndo();
+                  }
+                }}
+              />
+            </Tooltip>
+          );
+        }
       case "PDF Size":
         if (response.IsShow) {
           return (
@@ -3674,6 +3718,7 @@ const AutoCallPage = ({
                               if (pos) {
                                 componentToRender = (
                                   <PersonalDetails
+                                    ref={personalDetailsRef}
                                     newFieldValues={newFieldValues}
                                     buttonMaster={buttonMaster}
                                     isOpen={isModalOpen}
