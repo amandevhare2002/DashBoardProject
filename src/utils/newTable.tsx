@@ -1283,30 +1283,27 @@ const NewTablePage: React.FC<NewTableProps> = ({
           })
         : false;
 
-      // Special handling for dropdown buttons
+      // Special handling for Export button
       if (buttonName === "Export") {
         return (
           <ButtonDropdown
             key={button.ButtonID}
             isOpen={exportOpen}
             toggle={() => setExportOpen(!exportOpen)}
-            style={getButtonStyle(buttonName, button)}
             title={tooltip}
           >
             <DropdownToggle
               caret
               style={{
-                color: getButtonStyle(buttonName, button).color,
-                backgroundColor: getButtonStyle(buttonName, button)
-                  .backgroundColor,
-                borderRadius: getButtonStyle(buttonName, button).borderRadius,
+                ...getButtonStyle(buttonName, button),
+                minWidth: "auto",
+                padding: "6px 12px",
               }}
             >
-              {" "}
               {renderButtonIcon(button)}
               {buttonName}
             </DropdownToggle>
-            <DropdownMenu style={{ minWidth: "100%" }}>
+            <DropdownMenu style={{ minWidth: "150px" }}>
               <DropdownItem
                 onClick={() => convertToPDF(logo, headerRows, footerRows)}
               >
@@ -4729,23 +4726,23 @@ const NewTablePage: React.FC<NewTableProps> = ({
     try {
       const filteredData = rowsForExport();
       const htmlContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" 
-              xmlns:w="urn:schemas-microsoft-com:office:word"
-              xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-          <meta charset="UTF-8">
-          <title>${title || "Table Export"}</title>
-          <style>
-            table { border-collapse: collapse; width: 100%; }
-            th, td { border: 1px solid #000; padding: 5px; }
-            th { background-color: #f2f2f2; }
-          </style>
-        </head>
-        <body>
-          ${toTableHtml(filteredData)}
-        </body>
-        </html>
-      `;
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" 
+                xmlns:w="urn:schemas-microsoft-com:office:word"
+                xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <meta charset="UTF-8">
+            <title>${title || "Table Export"}</title>
+            <style>
+              table { border-collapse: collapse; width: 100%; }
+              th, td { border: 1px solid #000; padding: 5px; }
+              th { background-color: #f2f2f2; }
+            </style>
+          </head>
+          <body>
+            ${toTableHtml(filteredData)}
+          </body>
+          </html>
+        `;
       const blob = new Blob(["\ufeff", htmlContent], {
         type: "application/msword",
       });
@@ -5251,13 +5248,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
               style={{ position: "relative" }}
             >
               {/* <label className="flex items-center gap-1 text-sm">
-                <input
-                  type="checkbox"
-                  checked={virtualize}
-                  onChange={e => setVirtualize(e.target.checked)}
-                />
-                Virtualize
-              </label> */}
+                  <input
+                    type="checkbox"
+                    checked={virtualize}
+                    onChange={e => setVirtualize(e.target.checked)}
+                  />
+                  Virtualize
+                </label> */}
               <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-200">
                 <input
                   type="checkbox"
