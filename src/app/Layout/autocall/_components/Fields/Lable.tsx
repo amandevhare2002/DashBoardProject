@@ -22,29 +22,18 @@ export function LableField({
 }: any) {
   const hasError =
     (!saveData[field.FieldName] && field.IsMandatory) || field.hasError;
-  const rowNum = isDrag
-    ? field.SearchRownum || field.Rownum
-    : isPDFPreviewOpen
-      ? field.PDFRownum || field.Rownum || 0
-      : field.Rownum || 0;
-
-  const colNum = isDrag
-    ? field.SearchColnum || field.Colnum
-    : isPDFPreviewOpen
-      ? field.PDFColnum || field.Colnum || 0
-      : field.Colnum || 0;
-
-  const fieldWidth = isDrag
-    ? field.Width || field.SearchWidth
-    : isPDFPreviewOpen
-      ? field.PDFWidth || field.Width || "100px"
-      : field.Width || "100px";
-
-  const fieldHeight = isDrag
-    ? field.Height || field.SearchHeight
-    : isPDFPreviewOpen
-      ? field.PDFHeight || field.Height || "20px"
-      : field.Height || "20px";
+  const rowNum = isPDFPreviewOpen
+    ? field.PDFRownum || field.Rownum || 0
+    : field.Rownum || 0;
+  const colNum = isPDFPreviewOpen
+    ? field.PDFColnum || field.Colnum || 0
+    : field.Colnum || 0;
+  const fieldWidth = isPDFPreviewOpen
+    ? field.PDFWidth || field.Width || "100px"
+    : field.Width || "100px";
+  const fieldHeight = isPDFPreviewOpen
+    ? field.PDFHeight || field.Height || "20px"
+    : field.Height || "20px";
 
   // Ensure we have valid numeric values for positioning
   const safeRowNum = Math.max(0, parseInt(rowNum.toString()) || 0);
