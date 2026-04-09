@@ -224,11 +224,6 @@ const PersonalDetails = forwardRef(
 
     // ✅ UNDO FUNCTION: Restore the previous state
     const handleUndo = useCallback(() => {
-      if (undoHistory.length === 0) {
-        toast.info("No more history to undo", { style: { top: 80 } });
-        return;
-      }
-
       // Get the last saved state from history
       const previousState = undoHistory[undoHistory.length - 1];
 
@@ -237,8 +232,6 @@ const PersonalDetails = forwardRef(
 
       // Remove the last item from history
       setUndoHistory((prev) => prev.slice(0, -1));
-
-      toast.success("Undo successful", { style: { top: 80 } });
     }, [undoHistory]);
 
     // ✅ EXPOSE UNDO FUNCTION: Make handleUndo accessible from parent component

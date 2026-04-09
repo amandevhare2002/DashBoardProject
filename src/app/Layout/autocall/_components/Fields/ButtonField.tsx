@@ -1295,6 +1295,11 @@ export const ButtonField = ({
 
                       // Handle table columns
                       const tableWidth = result.data.TableWidth || [];
+                      // Ensure we have the latest table data - explicitly handle null/undefined
+                      const tableData = result.data.Table
+                        ? [...result.data.Table]
+                        : [];
+
                       const visibleColumns = tableWidth
                         .filter(
                           (col: any) =>
@@ -1309,8 +1314,7 @@ export const ButtonField = ({
 
                       // Update TableData and related fields
                       if (findIndex !== -1) {
-                        newUpdatedDetails[findIndex].TableData =
-                          result.data.Table || [];
+                        newUpdatedDetails[findIndex].TableData = tableData;
                         newUpdatedDetails[findIndex].TableFooter = tableWidth;
                         newUpdatedDetails[findIndex].TableColumns =
                           visibleColumns;
@@ -1321,7 +1325,8 @@ export const ButtonField = ({
                         if (tab?.Values && Array.isArray(tab.Values)) {
                           tab.Values.forEach((fieldItem: any) => {
                             if (fieldItem?.FieldID == fieldID) {
-                              fieldItem.buttonFields = result.data.Table || []; // Set to empty array if Table is empty
+                              // Explicitly clear and set the new data
+                              fieldItem.buttonFields = tableData;
                               fieldItem.tableColumns = visibleColumns;
                               fieldItem.tableFooter = tableWidth;
                             }
@@ -1329,7 +1334,10 @@ export const ButtonField = ({
                         }
                       });
 
-                      setUpdatedPersonalDetails(newUpdatedDetails);
+                      // Force state update with new object reference to trigger re-render
+                      setUpdatedPersonalDetails(
+                        JSON.parse(JSON.stringify(newUpdatedDetails)),
+                      );
                       downloadBase64File(
                         result.data.Base64string,
                         result.data.Filename,
@@ -1480,10 +1488,14 @@ export const ButtonField = ({
                       (res: any) => res.Nestedtab === result.data.NestedTab,
                     );
 
+                    // Ensure we have the latest table data - explicitly handle null/undefined
+                    const tableData = result.data.Table
+                      ? [...result.data.Table]
+                      : [];
+
                     // Update TableData for the tab
                     if (findIndex !== -1) {
-                      newUpdatedDetails[findIndex].TableData =
-                        result.data.Table || [];
+                      newUpdatedDetails[findIndex].TableData = tableData;
                     }
 
                     // Update buttonFields for the matching field
@@ -1492,13 +1504,17 @@ export const ButtonField = ({
                       if (tab?.Values && Array.isArray(tab.Values)) {
                         tab.Values.forEach((fieldItem: any) => {
                           if (fieldItem?.FieldID == fieldID) {
-                            fieldItem.buttonFields = result.data.Table || []; // Set to empty array if Table is empty
+                            // Explicitly clear and set the new data
+                            fieldItem.buttonFields = tableData;
                           }
                         });
                       }
                     });
 
-                    setUpdatedPersonalDetails(newUpdatedDetails);
+                    // Force state update with new object reference to trigger re-render
+                    setUpdatedPersonalDetails(
+                      JSON.parse(JSON.stringify(newUpdatedDetails)),
+                    );
                     toast.success("Success", { style: { top: 80 } });
 
                     // Update other fields
