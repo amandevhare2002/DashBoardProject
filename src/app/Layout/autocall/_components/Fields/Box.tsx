@@ -1,5 +1,5 @@
 import { Resizable } from "re-resizable";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { AiFillInfoCircle, AiFillEdit } from "react-icons/ai";
 import { FormGroup, Label, Input } from "reactstrap";
 import Tooltip from "rc-tooltip";
@@ -23,32 +23,100 @@ export function BoxField({
   fieldValue,
   isMobile,
 }: any) {
-  const [regexError, setRegexError] = React.useState<string | null>(null);
+  const [regexError, setRegexError] = useState<string | null>(null);
+  const [localValue, setLocalValue] = useState<string>("");
+
+  // Refs to track user interaction and prevent loops
+  const isUserTypingRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastProgrammaticUpdateRef = useRef<string | null>(null);
+  const isInitializedRef = useRef(false);
+
   const hasError =
     (!saveData[field.FieldName] && field.IsMandatory) || field.hasError;
+
+  // Validate regex function
   const validateRegex = (value: string) => {
     if (!field?.Regex) return true;
-
     try {
       const regex = new RegExp(field.Regex);
       return regex.test(value);
     } catch (error) {
       console.error("Invalid Regex:", field.Regex);
-      return true; // fail-safe: don't block input
+      return true;
     }
   };
 
+  // Initialize local value from saveData (only once)
   useEffect(() => {
-    if (field.IsFormulaApply && field.Formula && calculateFormula) {
-      const calculatedValue = calculateFormula(field.Formula, saveData);
-      if (calculatedValue !== null && calculatedValue !== undefined) {
-        // Update the field value if it's different from current
-        if (saveData[field.FieldName] !== calculatedValue) {
+    if (!isInitializedRef.current) {
+      const initialValue = saveData[field.FieldName] || "";
+      setLocalValue(initialValue);
+      isInitializedRef.current = true;
+    }
+  }, [field.FieldName, saveData]);
+
+  // Update local value when saveData changes (but not during user typing)
+  useEffect(() => {
+    // Skip if not initialized
+    if (!isInitializedRef.current) return;
+
+    // Skip if user is currently typing
+    if (isUserTypingRef.current) return;
+
+    // Skip if this is a programmatic update we just made
+    const newValue = saveData[field.FieldName] || "";
+    if (lastProgrammaticUpdateRef.current === newValue) {
+      lastProgrammaticUpdateRef.current = null;
+      return;
+    }
+
+    // Update local value if different
+    if (localValue !== newValue) {
+      setLocalValue(newValue);
+    }
+  }, [saveData[field.FieldName], field.FieldName, localValue]);
+
+  // Handle formula calculations (only when NOT typing)
+  useEffect(() => {
+    // Only for formula fields
+    if (!field.IsFormulaApply || !field.Formula || !calculateFormula) {
+      return;
+    }
+
+    // Don't apply formula while user is typing
+    if (isUserTypingRef.current) {
+      return;
+    }
+
+    // Calculate formula based on OTHER fields
+    const calculatedValue = calculateFormula(field.Formula, saveData);
+
+    if (calculatedValue !== null && calculatedValue !== undefined) {
+      const calculatedStr = String(calculatedValue);
+      const currentValue = saveData[field.FieldName];
+
+      // Only update if different
+      if (currentValue !== calculatedStr) {
+        // Mark this as a programmatic update
+        lastProgrammaticUpdateRef.current = calculatedStr;
+
+        // Update local value
+        setLocalValue(calculatedStr);
+
+        // Update saveData without triggering handleInputChange (to avoid loops)
+        setSaveData((prev: any) => ({
+          ...prev,
+          [field.FieldName]: calculatedStr,
+        }));
+
+        // Only call handleInputChange if it's not a user edit
+        if (handleInputChange && !isUserTypingRef.current) {
           handleInputChange(
             {
               target: {
                 name: field.FieldName,
-                value: calculatedValue,
+                value: calculatedStr,
               },
             },
             false,
@@ -56,16 +124,83 @@ export function BoxField({
         }
       }
     }
-  }, [saveData, field.IsFormulaApply, field.Formula]);
+  }, [
+    saveData,
+    field.IsFormulaApply,
+    field.Formula,
+    calculateFormula,
+    field.FieldName,
+  ]);
 
-  const handleChange = (e: any) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+
+    // Clear regex error
+    if (!newValue) {
+      setRegexError(null);
+    } else {
+      const isValid = validateRegex(newValue);
+      if (!isValid) {
+        setRegexError(field.RegexMessage || "Invalid format");
+      } else {
+        setRegexError(null);
+      }
+    }
+
+    // Mark that user is typing
+    isUserTypingRef.current = true;
+
+    // Clear previous timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Update local value immediately for responsive UI
+    setLocalValue(newValue);
+
+    // Update saveData
     setSaveData((prev: any) => ({
       ...prev,
-      [field.FieldName]: e.target.value,
+      [field.FieldName]: newValue,
     }));
+
+    // Call handleInputChange for side effects (validation, etc.)
+    if (handleInputChange) {
+      handleInputChange(e, false);
+    }
+
+    // Reset typing flag after user stops typing
+    timeoutRef.current = setTimeout(() => {
+      isUserTypingRef.current = false;
+
+      // After user stops typing, if this is a formula field, apply formula one more time
+      if (field.IsFormulaApply && field.Formula && calculateFormula) {
+        const calculatedValue = calculateFormula(field.Formula, saveData);
+        if (calculatedValue !== null && calculatedValue !== undefined) {
+          const calculatedStr = String(calculatedValue);
+          if (newValue !== calculatedStr) {
+            lastProgrammaticUpdateRef.current = calculatedStr;
+            setLocalValue(calculatedStr);
+            setSaveData((prev: any) => ({
+              ...prev,
+              [field.FieldName]: calculatedStr,
+            }));
+          }
+        }
+      }
+    }, 800); // Longer delay to ensure typing is complete
   };
 
-  // Your important positioning calculations
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Positioning calculations (same as before)
   const rowNum = isPDFPreviewOpen
     ? field.PDFRownum || field.Rownum || 0
     : field.Rownum || 0;
@@ -79,7 +214,6 @@ export function BoxField({
     ? field.PDFHeight || field.Height || "20px"
     : field.Height || "20px";
 
-  // Ensure we have valid numeric values for positioning
   const safeRowNum = Math.max(0, parseInt(rowNum.toString()) || 0);
   const safeColNum = Math.max(0, parseInt(colNum.toString()) || 0);
   const safeWidth = parseInt(fieldWidth.toString().replace("px", "")) || 100;
@@ -87,25 +221,6 @@ export function BoxField({
   const showBorder = field.IsBorderApply !== false;
   const borderColor = hasError ? "#dc3545" : field.bordercolor;
 
-  // Determine dimensions based on device - this will update immediately when isMobile changes
-  const getFieldDimensions = () => {
-    if (isMobile && !isPDFPreviewOpen) {
-      console.log("Using mobile dimensions for", field.FieldName);
-      return {
-        width: field.MWidth || "100%",
-        height: field.MHeight || field.Height || "auto",
-      };
-    } else {
-      return {
-        width: fieldWidth,
-        height: fieldHeight,
-      };
-    }
-  };
-
-  const dimensions = getFieldDimensions();
-
-  // Calculate the actual pixel values for rendering
   const getDisplaySize = () => {
     if (isMobile && !isPDFPreviewOpen) {
       return {
@@ -189,7 +304,7 @@ export function BoxField({
                   for={field?.FieldName}
                   className="bold max-w-fit"
                   style={{
-                    color: hasError ? "#dc3545" : field.fontcolor, // Fixed: Added error color
+                    color: hasError ? "#dc3545" : field.fontcolor,
                     backgroundColor: field.Bgcolor,
                     fontWeight: field.IsBold ? 700 : "normal",
                     textDecoration: field.IsUnderline ? "underline" : "none",
@@ -200,11 +315,7 @@ export function BoxField({
                 >
                   {field?.FieldName}{" "}
                   {field.IsMandatory ? (
-                    <span
-                      style={{
-                        color: hasError ? "#dc3545" : "red", // Fixed: Added error color
-                      }}
-                    >
+                    <span style={{ color: hasError ? "#dc3545" : "red" }}>
                       *
                     </span>
                   ) : null}
@@ -228,12 +339,12 @@ export function BoxField({
                     </div>
                   </Tooltip>
                 )}
-                {isDrag && (
+                {isDrag && field.IsEdit && (
                   <AiFillEdit
                     onClick={() => {
                       setModalData({
                         app_id: field.FieldID,
-                        ModuleID: information.Data[0]?.StrucureModuleID,
+                        ModuleID: information?.Data?.[0]?.StrucureModuleID,
                         IsPopUpOpen: field.IsPopUpOpen,
                         SideDrawerPos: field.SideDrawerPos,
                         SideDrawerWidth: field.SideDrawerWidth,
@@ -254,7 +365,7 @@ export function BoxField({
               id={field?.FieldName}
               invalid={field.error || hasError || !!regexError}
               name={field?.FieldName}
-              value={saveData[field.FieldName]}
+              value={localValue}
               placeholder={field.IsWatermarkPrint ? field.WatermarkText : ""}
               type={
                 field.FieldName === "DateofBirth"
@@ -265,25 +376,7 @@ export function BoxField({
                       ? "number"
                       : "text"
               }
-              onChange={(e) => {
-                const value = e.target.value;
-
-                // Regex validation
-                if (!value) {
-                  // Clear error when input is empty
-                  setRegexError(null);
-                } else {
-                  const isValid = validateRegex(value);
-
-                  if (!isValid) {
-                    setRegexError(field.RegexMessage || "Invalid format");
-                  } else {
-                    setRegexError(null);
-                  }
-                }
-
-                handleInputChange(e, false);
-              }}
+              onChange={handleChange}
               style={{
                 height: displaySize.height,
                 width: displaySize.width,
@@ -324,7 +417,7 @@ export function BoxField({
               width: "100%",
             }}
           >
-            {hasError ? "This field is required" : regexError}
+            {hasError ? `${field.FieldName} is required` : regexError}
           </div>
         )}
       </div>

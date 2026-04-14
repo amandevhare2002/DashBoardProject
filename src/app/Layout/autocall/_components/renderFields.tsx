@@ -474,6 +474,8 @@ export const RenderFields = ({
                 setModalData={setModalData}
                 setIsModalOpen={setIsModalOpen}
                 information={information}
+                isPDFPreviewOpen={isPDFPreviewOpen}
+                i={i}
               />
             ) : null;
 

@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 export type AdvancedTabsVariant =
@@ -234,6 +240,22 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
     [],
   );
   const idsInOrder = useMemo(() => tabs.map((t) => t.id), [tabs]);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const [verticalIndicator, setVerticalIndicator] = useState({
+    top: 0,
+    height: 44,
+  });
+
+  useLayoutEffect(() => {
+    if (variant !== "vertical") return;
+    const activeButton = tabRefs.current[activeId];
+    if (activeButton) {
+      setVerticalIndicator({
+        top: activeButton.offsetTop,
+        height: activeButton.offsetHeight,
+      });
+    }
+  }, [activeId, tabs, variant]);
 
   function focusNext(currentId: string, dir: 1 | -1) {
     if (!idsInOrder.length) return;
@@ -251,13 +273,24 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
 
   function onKeyDown(e: React.KeyboardEvent) {
     if (variant === "dropdown") return;
-    if (e.key === "ArrowRight") {
-      e.preventDefault();
-      focusNext(activeId, 1);
-    }
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      focusNext(activeId, -1);
+    if (variant === "vertical") {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        focusNext(activeId, 1);
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        focusNext(activeId, -1);
+      }
+    } else {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        focusNext(activeId, 1);
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        focusNext(activeId, -1);
+      }
     }
     if (e.key === "Home") {
       e.preventDefault();
@@ -589,15 +622,12 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
     if (variant === "vertical") {
       return (
         <div className="grid gap-4 sm:grid-cols-[220px_1fr]">
-          <div className="relative rounded-2xl border border-white/15 bg-slate-900/50 p-2">
+          <div className="relative rounded-2xl border">
             <motion.div
-              className="absolute left-2 right-2 h-11 rounded-xl bg-gradient-to-r from-cyan-400 to-indigo-500"
+              className="absolute left-2 right-2 rounded-xl"
               animate={{
-                y:
-                  Math.max(
-                    0,
-                    tabs.findIndex((t) => t.id === activeId),
-                  ) * 52,
+                top: verticalIndicator.top,
+                height: verticalIndicator.height,
               }}
               transition={{ type: "spring", stiffness: 420, damping: 34 }}
             />
@@ -612,6 +642,7 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
                     role="tab"
                     aria-selected={t.id === activeId}
                     disabled={tabIsDisabled(t)}
+                    tabIndex={isActive ? 0 : -1}
                     onClick={() => {
                       if (!tabIsDisabled(t)) {
                         isUserActionRef.current = true;
@@ -620,6 +651,9 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
                       }
                     }}
                     onKeyDown={onKeyDown}
+                    ref={(el) => {
+                      if (el) tabRefs.current[t.id] = el;
+                    }}
                     onMouseEnter={() => setHoveredTabId(t.id)}
                     onMouseLeave={() => setHoveredTabId(null)}
                     className={`relative z-10 w-full rounded-xl px-3 py-3 text-left text-sm font-semibold transition inline-flex items-center gap-2 ${
