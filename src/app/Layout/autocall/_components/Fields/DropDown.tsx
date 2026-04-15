@@ -526,7 +526,8 @@ export function DropDownField({
                   alignItems: "center",
                   justifyContent: field.Align,
                   width: "100%",
-                  marginTop: "-20px",
+                  // Replace the hardcoded marginTop: "-20px" with this:
+                  marginTop: `-${Math.max((field.FontSize || 14) * 1.7)}px`,
                 }}
               >
                 <Label

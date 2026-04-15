@@ -122,7 +122,7 @@ export function LableField({
                   justifyContent: field.Align,
                   width: "100%",
                   gap: 4,
-                  marginTop: "-30px",
+                  marginTop: `-${Math.max((field.FontSize || 14) * 1.7)}px`,
                 }}
               >
                 <Label
