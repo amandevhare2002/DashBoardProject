@@ -69,7 +69,7 @@ export const UploadField = ({
       className="resizer"
       style={{
         ...style,
-        marginLeft: "-10px",
+        // marginLeft: "-10px",
       }}
       size={{
         width: displayDimensions.width,

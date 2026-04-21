@@ -620,7 +620,7 @@ export function DropDownField({
                     height: displaySize.height,
                     width: displaySize.width,
                     minHeight: 32,
-                    marginLeft: "-10px",
+                    // marginLeft: "-10px",
                     border: showBorder ? `1px solid ${borderColor}` : "none",
                     borderColor: borderColor,
                     borderRadius:

@@ -358,7 +358,7 @@ export function DateField({
           top: isMobile && !isPDFPreviewOpen ? style.top : `${safeColNum}px`,
           zIndex: isDrag ? 1000 : "",
           paddingLeft: 0,
-          marginLeft: "-10px",
+          // marginLeft: "-10px",
           border:
             hasError || validationError ? "2px solid #dc3545" : style.border,
           backgroundColor:

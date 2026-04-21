@@ -389,7 +389,7 @@ export function BoxField({
                 fontStyle: field.IsTextItalic ? "italic" : "normal",
                 fontFamily: field.TextFontname,
                 marginBottom: 20,
-                marginLeft: "-20px",
+                // marginLeft: "-20px",
                 border: showBorder ? `1px solid ${borderColor}` : "none",
                 borderRadius:
                   field?.Shape === "ROUNDED"
