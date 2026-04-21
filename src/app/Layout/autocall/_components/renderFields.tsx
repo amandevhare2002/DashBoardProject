@@ -187,7 +187,10 @@ export const RenderFields = ({
     updatedPersonalDetails[value] &&
     updatedPersonalDetails[value]?.Values
       ? updatedPersonalDetails[value].Values.filter(
-          (field: any) => parentTabVisible && field.DefaultVisible !== false,
+          (field: any) =>
+            parentTabVisible &&
+            field.DefaultVisible !== false &&
+            field.MarkasFilter !== true, //,
         )
       : [];
 
