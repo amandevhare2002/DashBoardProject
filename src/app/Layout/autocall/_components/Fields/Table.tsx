@@ -1,5 +1,5 @@
 import { Resizable } from "re-resizable";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AiFillEdit, AiFillInfoCircle } from "react-icons/ai";
 import { Button, Col, FormGroup, Label } from "reactstrap";
 import Tooltip from "rc-tooltip";
@@ -8,6 +8,7 @@ import MainTable from "@/utils/table";
 import axios from "axios";
 import { toast } from "react-toastify";
 import NewTablePage from "@/utils/newTable";
+import { useTableWebSocket } from "@/utils/useWebsocket";
 
 export function TableField({
   style,
@@ -77,6 +78,15 @@ export function TableField({
 }: any) {
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
 
+  const wsUrl = field?.Link || "";
+  const wsParam = field?.ValueType || "";
+
+  const { wsData, wsStatus, sendMessage, reconnect } = useTableWebSocket({
+    url: wsUrl,
+    sendParam: wsParam,
+    enabled: !!wsUrl,
+  });
+  console.log("WebSocket Data for TableField:", wsData);
   // Your important positioning calculations - KEEP THESE
   const rowNum = isPDFPreviewOpen
     ? field.PDFRownum || field.Rownum || 0
@@ -166,6 +176,14 @@ export function TableField({
 
   // Check if this is the uploaded files table
   const isUploadedFilesTable = field.FieldName === "Uploaded Files";
+
+  // Merge live WebSocket data with any static buttonFields already on the field.
+  // wsData takes priority when available so the table always shows fresh data.
+  const resolvedTableData = useMemo(() => {
+    if (wsData && wsData.length > 0) return wsData;
+    return isUploadedFilesTable ? uploadedFiles : field.buttonFields || [];
+  }, [wsData, field.buttonFields, uploadedFiles, isUploadedFilesTable]);
+  // ── end WebSocket integration ──────────────────────────────────────────
 
   // Load reportData from sessionStorage if not provided via props
   const [localReportData, setLocalReportData] = useState(reportData);
@@ -543,35 +561,31 @@ export function TableField({
   const processedColumns = useMemo(() => {
     if (isUploadedFilesTable) return uploadedFilesColumns;
 
-    // Get the table data to see actual column names
-    const tableData = isUploadedFilesTable ? uploadedFiles : field.buttonFields;
+    // ── KEY CHANGE ──────────────────────────────────────────────────────────
+    // Use resolvedTableData (which may be wsData) instead of field.buttonFields
+    // so column IDs always match the actual row keys.
+    const tableData = resolvedTableData;
+    // ────────────────────────────────────────────────────────────────────────
+
     const actualColumnNames =
       tableData && tableData.length > 0 ? Object.keys(tableData[0]) : [];
 
-    // Create columns with proper input type mapping
     const regularCols = actualColumnNames.map((columnName: string) => {
-      // Find the exact column data from reportData
       let columnData = localReportData?.columnsArray?.find(
         (data: any) => data?.columnName === columnName,
       );
-
-      // If not found, try case-insensitive match
       if (!columnData) {
         columnData = localReportData?.columnsArray?.find(
           (data: any) =>
             data?.columnName?.toLowerCase() === columnName.toLowerCase(),
         );
       }
-
-      // If still not found, try removing VC_ prefix
       if (!columnData && columnName.startsWith("VC_")) {
         const cleanName = columnName.replace("VC_", "");
         columnData = localReportData?.columnsArray?.find(
           (data: any) => data?.columnName === cleanName,
         );
       }
-
-      // If still not found, try adding VC_ prefix
       if (!columnData && !columnName.startsWith("VC_")) {
         const vcName = `VC_${columnName}`;
         columnData = localReportData?.columnsArray?.find(
@@ -588,20 +602,43 @@ export function TableField({
         sortable: true,
         wrap: true,
         reorder: true,
-        inputType: inputType,
-        isDisabled: isDisabled,
+        inputType,
+        isDisabled,
       };
     });
 
     return [...regularCols, ...actionsColumn];
   }, [
     isUploadedFilesTable,
-    uploadedFiles,
-    field.buttonFields,
+    resolvedTableData,
     uploadedFilesColumns,
     actionsColumn,
     localReportData,
   ]);
+
+  const prevWsDataLengthRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!wsData || wsData.length === 0) return;
+
+    const prevLen = prevWsDataLengthRef.current;
+    const newLen = wsData.length;
+
+    if (prevLen > 0 && newLen !== prevLen) {
+      // Row count changed — surface a toast so the user knows
+      toast.info(
+        `Live data updated: ${newLen} row${newLen !== 1 ? "s" : ""} received`,
+        {
+          position: "top-right",
+          autoClose: 3000,
+          style: { top: "50px" },
+          toastId: `ws_update_${field?.FieldID}`,
+        },
+      );
+    }
+
+    prevWsDataLengthRef.current = newLen;
+  }, [wsData]);
 
   return (
     <Resizable
@@ -753,12 +790,56 @@ export function TableField({
               minHeight: 0,
             }}
           >
+            {/* WS status indicator */}
+            {wsUrl && (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginBottom: 4,
+                  fontSize: 11,
+                }}
+              >
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    display: "inline-block",
+                    backgroundColor:
+                      wsStatus === "connected"
+                        ? "#28a745"
+                        : wsStatus === "connecting"
+                          ? "#ffc107"
+                          : wsStatus === "error"
+                            ? "#dc3545"
+                            : "#6c757d",
+                  }}
+                />
+                <span style={{ color: "#6c757d" }}>WS: {wsStatus}</span>
+                {(wsStatus === "disconnected" || wsStatus === "error") && (
+                  <button
+                    onClick={reconnect}
+                    style={{
+                      fontSize: 10,
+                      padding: "1px 6px",
+                      cursor: "pointer",
+                      border: "1px solid #6c757d",
+                      borderRadius: 3,
+                      background: "transparent",
+                    }}
+                  >
+                    Reconnect
+                  </button>
+                )}
+              </div>
+            )}
+
             <NewTablePage
               title={"Record Table"}
               key={`table_${field}-${menuID}`}
-              TableArray={
-                isUploadedFilesTable ? uploadedFiles : field.buttonFields || []
-              }
+              TableArray={resolvedTableData}
               columns={processedColumns}
               moduleID={moduleID || menuID}
               buttonID={fieldID}
