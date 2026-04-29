@@ -68,10 +68,11 @@ export function OuterAdvancedTabs({
       scroll: "scroll",
       step: "step",
       dropdown: "dropdown",
-      nested: "underline", // nested positioning handled by AutoCallPage
+      nested: "underline",
       status: "status",
       draggable: "draggable",
       search: "search",
+      closeable: "closeable",
     };
     return variantMap[outerTabType.toLowerCase()] || "vertical";
   }, [outerTabType]);

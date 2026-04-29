@@ -1,6 +1,14 @@
-// Sidebar Base
+// _sidebar-base.scss
+// Supports two layout modes controlled by a body class set by Nav component:
+//   .nav-mode-vertical   → classic vertical sidebar (original behaviour)
+//   .nav-mode-horizontal → new fixed horizontal navbar
 
 @use "sass:math";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED / DEFAULT (mobile-first, vertical)
+// These rules apply to BOTH modes. Mode-specific overrides follow below.
+// ─────────────────────────────────────────────────────────────────────────────
 
 .app-sidebar {
   width: $app-sidebar-width;
@@ -69,16 +77,146 @@
   z-index: 12;
 }
 
-// Sidebar Components
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VERTICAL MODE  (.nav-mode-vertical on <body>)
+// Restores the original sidebar exactly — no changes at all from the old file.
+// ─────────────────────────────────────────────────────────────────────────────
+
+.nav-mode-vertical {
+
+  // Nothing extra needed here — the default rules above already implement the
+  // vertical sidebar. We only need this block if we want to UNDO any horizontal
+  // overrides that might bleed in (there are none in this file, but it's here
+  // for clarity and future-proofing).
+
+  .app-sidebar {
+    // Reset to vertical defaults in case anything was overridden elsewhere
+    width: $app-sidebar-width;
+    height: auto;          // let fixed-sidebar control height via its own rules
+    flex-direction: column;
+    align-items: initial;
+    top: initial;
+    left: initial;
+    padding: initial;
+    padding-top: $app-header-height;
+    margin-top: -$app-header-height;
+    position: relative;   // fixed-sidebar.scss overrides to fixed for its class
+    background-color: initial;
+    box-shadow: initial;
+
+    .app-sidebar__inner {
+      display: block;
+      padding: 2px ($layout-spacer-x) $layout-spacer-x;
+      gap: initial;
+      height: initial;
+    }
+
+    .scrollbar-container {
+      display: block;
+      overflow: hidden !important; // PerfectScrollbar controls this
+    }
+
+    .app-sidebar-bg {
+      display: block;
+    }
+  }
+
+  .app-main {
+    margin-top: 0; // vertical mode has no horizontal bar offset
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HORIZONTAL MODE  (.nav-mode-horizontal on <body>)
+// Applied only on desktop (Nav component only sets this class when !isMobile
+// && !DisplayVertical, but we add a media-query guard here too for safety).
+// ─────────────────────────────────────────────────────────────────────────────
+
+@media (min-width: 992px) {
+  .nav-mode-horizontal {
+
+    // The sidebar element becomes a full-width fixed bar at the top
+    .app-sidebar {
+      width: 100% !important;
+      min-width: 100% !important;
+      flex: none !important;
+      height: 60px;
+      flex-direction: row;
+      align-items: center;
+
+      position: fixed !important;
+      top: $app-header-height;   // sits directly below the app header
+      left: 0;
+      right: 0;
+
+      margin-top: 0;
+      padding: 0;                // HorizontalNav manages its own internal padding
+
+      overflow: visible;         // portals need to escape
+      z-index: 100;
+
+      // The inner div is managed entirely by HorizontalNav's inline styles
+      .app-sidebar__inner {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        gap: 0;
+        overflow: visible;
+      }
+
+      // PerfectScrollbar must not clip the horizontal bar
+      .scrollbar-container {
+        display: flex;
+        flex-direction: row;
+        overflow: visible !important;
+        height: 100%;
+      }
+
+      // Background image overlay doesn't make sense in horizontal mode
+      .app-sidebar-bg {
+        display: none;
+      }
+
+      // Logo already lives in the app-header in desktop mode
+      .app-header__logo {
+        display: none;
+      }
+    }
+
+    // Push page content down so it isn't hidden behind the fixed horizontal bar
+    .app-main {
+      margin-top: 50px; // matches the horizontal bar height
+    }
+
+    // In horizontal mode the overlay is never needed
+    .sidebar-mobile-overlay {
+      display: none !important;
+    }
+  }
+  .create-menu {
+     display: "flex";
+     justify-content: "center";
+     align-items: "center";
+     margin-top: 10;
+     margin-bottom: 10;
+     flex-direction: "column";
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENT IMPORTS (unchanged — apply to both modes)
+// ─────────────────────────────────────────────────────────────────────────────
 
 @import "modifiers/navmenu-vertical";
 
-// Sidebar Modifiers
-
 @import "themes/sidebar-light";
 @import "themes/sidebar-dark";
-//@import "themes/sidebar-inverted";
-
 
 @import "modifiers/fixed-sidebar";
 @import "modifiers/closed-sidebar";

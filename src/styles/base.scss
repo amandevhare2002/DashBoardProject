@@ -598,3 +598,15 @@ img {
     opacity: 1;
   }
 }
+
+/* WebSocket Connection Status Pulse Animation */
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}

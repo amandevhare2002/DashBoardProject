@@ -1,71 +1,137 @@
-// Fixed Sidebar
+// _fixed-sidebar.scss
+// Original vertical-sidebar rules are untouched and scoped under .nav-mode-vertical.
+// Horizontal mode neutralises the fixed-sidebar offsets so layout is correct.
 
-.fixed-sidebar {
+// ─────────────────────────────────────────────────────────────────────────────
+// VERTICAL MODE — original rules, completely unchanged
+// ─────────────────────────────────────────────────────────────────────────────
+
+.nav-mode-vertical {
+
+  .fixed-sidebar {
+    .app-sidebar {
+      position: fixed;
+      height: 100vh;
+    }
+
+    .app-main {
+      .app-main__outer {
+        z-index: 9;
+        padding-left: $app-sidebar-width;
+      }
+    }
+
+    &.fixed-header {
+      .app-sidebar {
+        .app-header__logo {
+          display: none;
+        }
+      }
+    }
+
+    &:not(.fixed-header) {
+      .app-sidebar {
+        .app-header__logo {
+          display: flex;
+        }
+      }
+
+      .app-header {
+        margin-left: $app-sidebar-width;
+
+        .app-header__logo {
+          display: none;
+        }
+      }
+    }
+
+    &.closed-sidebar {
+      &:not(.fixed-header) {
+        .app-header {
+          margin-left: $app-sidebar-width-collapsed;
+        }
+
+        .app-sidebar {
+          .app-header__logo {
+            width: $app-sidebar-width-collapsed;
+            padding: 0;
+
+            .logo-src {
+              display: none;
+            }
+
+            .header__pane {
+              margin-right: auto;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HORIZONTAL MODE — neutralise fixed-sidebar left-padding and margin offsets
+// The sidebar is already a fixed top bar, so the side-padding rules must not fire.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@media (min-width: 992px) {
+  .nav-mode-horizontal {
+
+    &.fixed-sidebar,
+    .fixed-sidebar {
+
+      // Sidebar is handled by _sidebar-base.scss horizontal rules
+      .app-sidebar {
+        // height/position already set in _sidebar-base; nothing to override here
+      }
+
+      // Remove the left padding that was there for the vertical sidebar
+      .app-main {
+        .app-main__outer {
+          padding-left: 0 !important;
+          z-index: 9;
+        }
+      }
+
+      // Remove horizontal margin offset on the header that existed for the sidebar
+      .app-header {
+        margin-left: 0 !important;
+      }
+
+      // closed-sidebar collapses/expands the vertical sidebar — irrelevant in horizontal mode
+      &.closed-sidebar {
+        .app-main {
+          .app-main__outer {
+            padding-left: 0 !important;
+          }
+        }
+
+        .app-header {
+          margin-left: 0 !important;
+        }
+      }
+    }
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FALLBACK — when neither body class is present yet (pre-hydration / SSR)
+// Mirror the original vertical rules so there is no layout flash.
+// ─────────────────────────────────────────────────────────────────────────────
+
+.fixed-sidebar:not(.nav-mode-vertical .fixed-sidebar):not(.nav-mode-horizontal .fixed-sidebar) {
   .app-sidebar {
     position: fixed;
     height: 100vh;
   }
 
   .app-main {
-
     .app-main__outer {
       z-index: 9;
       padding-left: $app-sidebar-width;
-    }
-
-  }
-
-  &.fixed-header {
-    .app-sidebar {
-      .app-header__logo {
-        display: none;
-      }
-    }
-  }
-
-  &:not(.fixed-header) {
-    .app-sidebar {
-      .app-header__logo {
-        display: flex;
-      }
-    }
-
-    .app-header {
-
-      margin-left: $app-sidebar-width;
-
-      .app-header__logo {
-        display: none;
-      }
-    }
-
-    .app-main {
-      //z-index: 12;
-    }
-  }
-
-  &.closed-sidebar {
-    &:not(.fixed-header) {
-
-      .app-header {
-        margin-left: $app-sidebar-width-collapsed;
-      }
-
-      .app-sidebar {
-
-        .app-header__logo {
-          width: $app-sidebar-width-collapsed;
-          padding: 0;
-
-          .logo-src {
-            display: none;
-          }
-
-          .header__pane {
-            margin-right: auto;
-          }
-        }
-      }
     }
   }
 }

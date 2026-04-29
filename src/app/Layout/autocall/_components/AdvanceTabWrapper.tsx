@@ -216,7 +216,10 @@ export function DynamicAdvancedTabs({
       <AdvancedTabs
         key={`tabs-${processedTabs.length}-${variant}`}
         variant={variant}
-        tabs={processedTabs}
+        tabs={processedTabs.map((t) => ({
+          ...t,
+          closable: closeable || variant === "closeable" ? true : t.closable,
+        }))}
         activeId={internalActiveId}
         onActiveChange={handleTabChange}
         closeable={closeable || variant === "closeable"}

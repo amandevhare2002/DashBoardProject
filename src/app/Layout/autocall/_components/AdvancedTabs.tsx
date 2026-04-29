@@ -144,7 +144,18 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
 
   // internal tabs state (sync from props)
   const [tabsState, setTabsState] = useState<AdvancedTab[]>(tabsProp);
-  useEffect(() => setTabsState(tabsProp), [tabsProp]);
+  // useEffect(() => setTabsState(tabsProp), [tabsProp]);
+  useEffect(() => {
+    const prevIds = tabsState.map((t) => t.id).join(",");
+    const nextIds = tabsProp.map((t) => t.id).join(",");
+    // Only do a full reset if tabs were added from outside (new ids appeared)
+    // Never reset if we only have fewer or reordered — those are internal mutations
+    const prevSet = new Set(tabsState.map((t) => t.id));
+    const nextHasNew = tabsProp.some((t) => !prevSet.has(t.id));
+    if (nextHasNew) {
+      setTabsState(tabsProp);
+    }
+  }, [tabsProp]);
   const tabs = tabsState;
 
   // active
@@ -168,10 +179,12 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
   }, [controlledActiveId]);
 
   useEffect(() => {
-    if (!activeId && initialActive) setActiveId(initialActive);
-    if (activeId && !tabs.some((t) => t.id === activeId))
-      setActiveId(tabs[0]?.id ?? "");
-  }, [tabs.length]);
+    if (!activeId && tabsState[0]?.id) {
+      setActiveId(tabsState[0].id);
+    } else if (activeId && !tabsState.some((t) => t.id === activeId)) {
+      setActiveId(tabsState[0]?.id ?? "");
+    }
+  }, [tabsState.length]);
 
   // Only notify parent when it's a USER action, not a prop sync
   useEffect(() => {
@@ -181,11 +194,12 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
   }, [activeId, onActiveChange]);
 
   useEffect(() => {
-    if (!activeId && initialActive) setActiveId(initialActive);
-    if (activeId && !tabs.some((t) => t.id === activeId))
-      setActiveId(tabs[0]?.id ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs.length]);
+    if (!activeId && tabsState[0]?.id) {
+      setActiveId(tabsState[0].id);
+    } else if (activeId && !tabsState.some((t) => t.id === activeId)) {
+      setActiveId(tabsState[0]?.id ?? "");
+    }
+  }, [tabsState.length]);
 
   const tabIsDisabled = (t: AdvancedTab) => {
     if (t.disabled) return true;
@@ -202,8 +216,8 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
   }, [activeId, variant]);
 
   function requestTabsChange(next: AdvancedTab[]) {
-    onTabsChange?.(next);
     setTabsState(next);
+    onTabsChange?.(next);
   }
 
   function closeTab(id: string) {
@@ -371,8 +385,6 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
   const renderTabButton = (t: AdvancedTab) => {
     const active = t.id === activeId;
     const disabled = tabIsDisabled(t);
-
-    // Get tab-specific styling from _tabStyle
     const tabStyle = t._tabStyle || {};
     const { bgColor, fontColor, hoverColor, fontStyles } = getTabColors(
       t,
@@ -380,72 +392,29 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
     );
 
     let iconElement: React.ReactNode = t.icon;
-    // If icon is a string (like "pe-7s-sun"), convert it to an element
     if (typeof t.icon === "string") {
       const iconColor =
         tabStyle.iconColor ||
         tabStyle.fontColor ||
-        styleProps?.activeTab?.color ||
-        styleProps?.inactiveTab?.color;
-
+        styleProps?.activeTab?.color;
       iconElement = (
         <i
           className={t.icon}
-          style={{
-            fontSize: fontSize,
-            color: iconColor,
-            marginRight: "8px", // Add some spacing
-          }}
+          style={{ fontSize, color: iconColor, marginRight: "8px" }}
         />
       );
     }
 
-    // Use tab-specific colors if available, otherwise use global styles
     const activeBgColor = String(
-      tabStyle.activeColor ||
-        styleProps?.activeTab?.background ||
-        styleOverrides?.activeTab?.backgroundColor ||
-        "",
+      tabStyle.activeColor || styleProps?.activeTab?.background || "",
     );
-
     const inactiveBgColor = String(
-      tabStyle.inactiveColor ||
-        styleProps?.inactiveTab?.background ||
-        styleOverrides?.inactiveTab?.backgroundColor ||
-        "",
+      tabStyle.inactiveColor || styleProps?.inactiveTab?.background || "",
     );
-
-    const tabFontColor =
-      tabStyle.fontColor ||
-      styleProps?.activeTab?.color ||
-      styleOverrides?.activeTab?.color;
-
-    const borderColor =
-      (active ? tabStyle.borderColor : undefined) ||
-      (active ? styleProps?.activeTab?.borderColor : undefined) ||
-      (active ? styleOverrides?.activeTab?.borderColor : undefined);
-
-    const getTabStyle = () => {
-      if (!styleOverrides) return {};
-
-      if (active && styleOverrides.activeTab) {
-        return {
-          backgroundColor: styleOverrides.activeTab.backgroundColor,
-          color: styleOverrides.activeTab.color,
-          borderColor: styleOverrides.activeTab.borderColor,
-          backgroundImage: styleOverrides.activeTab.backgroundImage,
-        };
-      }
-
-      if (!active && styleOverrides.inactiveTab) {
-        return {
-          backgroundColor: styleOverrides.inactiveTab.backgroundColor,
-          color: styleOverrides.inactiveTab.color,
-        };
-      }
-
-      return {};
-    };
+    const tabFontColor = tabStyle.fontColor || styleProps?.activeTab?.color;
+    const borderColor = active
+      ? tabStyle.borderColor || styleProps?.activeTab?.borderColor
+      : undefined;
 
     const buttonStyle: React.CSSProperties = {
       backgroundColor:
@@ -457,19 +426,43 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
         ? `2px solid ${borderColor ?? "transparent"}`
         : "1px solid transparent",
       ...fontStyles,
-      ...getTabStyle(),
+      cursor: isReorderable ? "grab" : "pointer", // ← visual cue
     };
 
-    const ariaId = `tab-${t.id}`;
-    const panelId = `panel-${t.id}`;
-
     return (
-      <motion.div key={t.id} layout>
+      // ↓ Remove `layout` when reorderable — it fights HTML5 DnD
+      <motion.div
+        key={t.id}
+        {...(isReorderable ? {} : { layout: true })}
+        draggable={isReorderable}
+        onDragStart={(e) => {
+          if (!isReorderable) return;
+          dragId.current = t.id;
+          // ↓ Required: set drag data so browser activates DnD
+          (e as any).dataTransfer.effectAllowed = "move";
+          (e as any).dataTransfer.setData("text/plain", t.id);
+        }}
+        onDragEnd={() => {
+          dragId.current = null;
+        }}
+        onDragOver={(e) => {
+          if (!isReorderable) return;
+          e.preventDefault();
+          (e as any).dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (!isReorderable || !dragId.current || dragId.current === t.id)
+            return;
+          moveTab(dragId.current, t.id);
+          dragId.current = null;
+        }}
+      >
         <button
-          id={ariaId}
+          id={`tab-${t.id}`}
           role="tab"
           aria-selected={active}
-          aria-controls={panelId}
+          aria-controls={`panel-${t.id}`}
           disabled={disabled}
           tabIndex={active ? 0 : -1}
           onClick={() => {
@@ -482,46 +475,13 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
           onMouseEnter={() => setHoveredTabId(t.id)}
           onMouseLeave={() => setHoveredTabId(null)}
           onKeyDown={onKeyDown}
-          draggable={isReorderable}
-          onDragStart={() => (dragId.current = t.id)}
-          onDragOver={(e) => {
-            if (isReorderable) e.preventDefault();
-          }}
-          onDrop={() => {
-            if (!isReorderable) return;
-            if (!dragId.current) return;
-            moveTab(dragId.current, t.id);
-            dragId.current = null;
-          }}
           className="group relative inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus:outline-none focus:ring-2 focus:ring-cyan-400/40"
           style={buttonStyle}
-          title={isReorderable ? "Drag to reorder" : undefined}
+          // ↓ Do NOT put drag handlers here — they belong on the wrapper div
         >
           {variant === "draggable" && (
-            <span className={`${active ? "opacity-90" : "opacity-60"}`}>⠿</span>
-          )}
-
-          {variant === "icon" && (
-            <span className="text-base">{t.icon ?? "•"}</span>
-          )}
-
-          {variant === "status" && (
-            <span className="relative flex h-2.5 w-2.5">
-              <span
-                className={`absolute inset-0 rounded-full ${t.online ? "bg-emerald-400" : "bg-slate-500"}`}
-              />
-              {t.online && (
-                <motion.span
-                  className="absolute inset-0 rounded-full bg-emerald-400"
-                  initial={{ opacity: 0.55, scale: 1 }}
-                  animate={{ opacity: 0, scale: 2 }}
-                  transition={{
-                    duration: 1.2,
-                    repeat: Infinity,
-                    ease: "easeOut",
-                  }}
-                />
-              )}
+            <span style={{ opacity: active ? 0.9 : 0.6, userSelect: "none" }}>
+              ⠿
             </span>
           )}
           {iconElement && (
@@ -529,15 +489,9 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
               {iconElement}
             </span>
           )}
-          <span
-            className="max-w-full whitespace-nowrap"
-            style={{
-              fontSize: fontSize,
-            }}
-          >
+          <span className="max-w-full whitespace-nowrap" style={{ fontSize }}>
             {t.label}
           </span>
-
           {(t.badge ?? t.badge === 0) && variant !== "slider" && (
             <span
               className={`ml-1 rounded-full px-2 py-0.5 text-[10px] ${active ? "bg-black/10 text-black" : "bg-white/10 text-slate-100"}`}
@@ -545,11 +499,6 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
               {t.badge}
             </span>
           )}
-
-          {variant === "status" && t.dot && (
-            <span className="ml-1 inline-flex h-2 w-2 rounded-full bg-fuchsia-400 shadow-[0_0_14px_rgba(232,121,249,0.8)]" />
-          )}
-
           {isCloseable && (t.closable ?? true) && tabs.length > 1 && (
             <span
               role="button"
@@ -567,20 +516,18 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
               ×
             </span>
           )}
-
           {variant === "underline" && active && (
             <motion.div
               layoutId={`${listId}-underline`}
               style={{
                 background:
                   bgColor ||
-                  "linear-gradient(to right, rgb(34, 211, 238), rgb(192, 132, 250), rgb(16, 185, 129))",
+                  "linear-gradient(to right, rgb(34,211,238), rgb(192,132,250), rgb(16,185,129))",
               }}
               className="absolute inset-x-2 -bottom-2 h-[2px] rounded-full"
               transition={{ type: "spring", stiffness: 420, damping: 30 }}
             />
           )}
-
           <span className="pointer-events-none absolute inset-0 rounded-xl ring-1 ring-white/10 opacity-0 transition group-hover:opacity-100" />
         </button>
       </motion.div>
@@ -601,7 +548,12 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
           <div className="relative">
             <select
               value={activeId}
-              onChange={(e) => setActiveId(e.target.value)}
+              onChange={(e) => {
+                const id = e.target.value;
+                isUserActionRef.current = true;
+                setActiveId(id);
+                onActiveChange?.(id);
+              }}
               className="rounded-xl border border-white/15 bg-slate-900/60 px-3 py-2 text-sm text-slate-100 outline-none"
             >
               {tabs.map((t) => (
@@ -702,7 +654,7 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
         tabs.findIndex((t) => t.id === activeId),
       );
       return (
-        <div className="grid gap-2 sm:grid-cols-4" {...listCommonProps}>
+        <div className="grid gap-2 sm:grid-cols-4 mt-2" {...listCommonProps}>
           {tabs.map((t, i) => {
             const done = i < activeIndex;
             const active = i === activeIndex;
@@ -1135,12 +1087,6 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
               : ""}
           </motion.div>
         </AnimatePresence>
-      )}
-
-      {variant === "draggable" && (
-        <div className="text-xs text-slate-300">
-          Tip: drag a tab onto another tab to reorder.
-        </div>
       )}
     </div>
   );

@@ -179,6 +179,7 @@ export const AppSidebar = ({
   const [searchbgColor, setSearchbgColor] = useState<any>(null);
   const [isMenuItems, setIsMenuItems] = useState<any>(null);
   const [isMenuHeaders, setIsMenuHeaders] = useState<any>(null);
+  const [dynamicVertical, setDynamicVerticle] = useState(true);
 
   // const userData = useSelector((state: any) => state.authReducer.userData);
 
@@ -194,6 +195,7 @@ export const AppSidebar = ({
     setSearchbgColor(menuData?.Searchboxbgcolor);
     setIsMenuItems(menuData?.menuitems);
     setIsMenuHeaders(menuData?.MenuHeaders);
+    setDynamicVerticle(menuData?.DynamicVertical);
     console.log("sidebarData", menuData);
   }, []);
   console.log("NewMenuItems?.newHeaderList", NewMenuItems?.newHeaderList);
@@ -273,6 +275,7 @@ export const AppSidebar = ({
               })}
               style={{
                 backgroundColor: sidebarData,
+                zIndex: dynamicVertical ? 0 : 9,
               }}
               appear={true}
               enter={false}
@@ -283,6 +286,7 @@ export const AppSidebar = ({
                 <PerfectScrollbar>
                   <div className="app-sidebar__inner">
                     <div
+                      className="create-menu"
                       style={{
                         display: "flex",
                         justifyContent: "center",
@@ -290,12 +294,14 @@ export const AppSidebar = ({
                         marginTop: 10,
                         marginBottom: 10,
                         flexDirection: "column",
+                        width: dynamicVertical ? "100%" : "12%",
                       }}
                     >
                       <Button
                         onClick={() => {
                           setIsAutoCallOpen(true);
                         }}
+                        className="create-menu-btn"
                       >
                         Create Menu Groups
                       </Button>
@@ -330,7 +336,10 @@ export const AppSidebar = ({
                         />
                       )}
                     />
-                    <div className="my-2 relative w-full">
+                    <div
+                      className="my-2 relative"
+                      style={{ width: dynamicVertical ? "100%" : "30rem" }}
+                    >
                       <Autocomplete
                         sx={{
                           height: "100%",
