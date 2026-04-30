@@ -907,9 +907,21 @@ const AutoCallPage = ({
         });
         setCardViewData(finalUpdatedArray);
       }
-    } catch (error) {
-      console.error("Error in search:", error);
-      toast.error("Failed to perform search");
+    } catch (error: any) {
+      toast.error("No Data Found", {
+        style: { top: "110px" },
+      });
+
+      // Clear old data when error occurs
+      setSearchLeadData({
+        tables: [],
+        tableWidth: [],
+        isDetailPopupOpen: false,
+        cardData: [],
+        defaultVisibleSearch: null,
+        isFreezeHeader: false,
+      });
+      setCardViewData([]);
     } finally {
       setLoading(false);
     }
