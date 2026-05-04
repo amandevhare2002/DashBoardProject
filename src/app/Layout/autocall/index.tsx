@@ -556,7 +556,6 @@ const AutoCallPage = ({
   };
 
   // In AutoCallPage component, replace the fetchDropdownDataForAllFields function
-  // In AutoCallPage component, replace the fetchDropdownDataForSearchFields function with this:
   const fetchDropdownDataForSearchFields = async () => {
     try {
       setLoading(true);

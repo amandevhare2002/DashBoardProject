@@ -190,7 +190,7 @@ export const RenderFields = ({
           (field: any) =>
             parentTabVisible &&
             field.DefaultVisible !== false &&
-            field.MarkasFilter !== true, //,
+            !(field.FieldType === "BUTTON" && field.ValueType === "SEARCH"),
         )
       : [];
 

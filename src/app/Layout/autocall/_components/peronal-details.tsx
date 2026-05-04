@@ -5439,7 +5439,11 @@ const PersonalDetails = forwardRef(
                                     (_: any, rowIndex: any) => (
                                       <tr key={rowIndex}>
                                         {fieldsInGroup.map((field: any) => {
-                                          return field.DefaultVisible ? (
+                                          return field.DefaultVisible &&
+                                            !(
+                                              field.FieldType === "BUTTON" &&
+                                              field.ValueType === "SEARCH"
+                                            ) ? (
                                             <td
                                               key={`${field?.FieldID}-${rowIndex}`}
                                               style={{
