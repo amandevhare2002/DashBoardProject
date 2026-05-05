@@ -2940,7 +2940,7 @@ const AutoCallPage = ({
                   >
                     <div>
                       <div
-                        className="space-y-2 py-4 flex flex-col h-full text-white mt-14 overflow-y-auto"
+                        className="space-y-2 py-4 flex flex-col h-full text-white overflow-y-auto"
                         style={{
                           backgroundColor: `${information?.Data?.[0]?.Bgcolor}`,
                         }}
