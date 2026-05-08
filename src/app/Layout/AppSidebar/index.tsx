@@ -275,7 +275,7 @@ export const AppSidebar = ({
               })}
               style={{
                 backgroundColor: sidebarData,
-                zIndex: dynamicVertical ? 0 : 9,
+                zIndex: dynamicVertical ? 9999 : 9,
               }}
               appear={true}
               enter={false}

@@ -134,14 +134,67 @@ const DropdownPortal = ({
   bgColor,
 }: DropdownPortalProps) => {
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const portalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!anchorRef.current) return;
-    const r = anchorRef.current.getBoundingClientRect();
-    setCoords({
-      top: r.bottom + window.scrollY + 2,
-      left: r.left + window.scrollX,
-    });
+
+    const calculatePosition = () => {
+      if (!anchorRef.current || !portalRef.current) return;
+
+      const r = anchorRef.current.getBoundingClientRect();
+      const portalWidth = portalRef.current.offsetWidth || 240;
+      const gap = 2;
+      const viewportWidth = window.innerWidth;
+      const padding = 8; // Add padding for edge safety
+
+      let newLeft = r.left + window.scrollX;
+
+      // Check if dropdown would overflow on the right
+      if (newLeft + portalWidth + padding > viewportWidth) {
+        // Shift left to keep it in view
+        newLeft =
+          Math.max(0, viewportWidth - portalWidth - padding) + window.scrollX;
+      }
+
+      setCoords({
+        top: r.bottom + window.scrollY + gap,
+        left: newLeft,
+      });
+    };
+
+    // Calculate position on next frame to ensure portal is rendered
+    const timeoutId = setTimeout(calculatePosition, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [anchorRef]);
+
+  // Recalculate on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (anchorRef.current && portalRef.current) {
+        const r = anchorRef.current.getBoundingClientRect();
+        const portalWidth = portalRef.current.offsetWidth || 240;
+        const gap = 2;
+        const viewportWidth = window.innerWidth;
+        const padding = 8;
+
+        let newLeft = r.left + window.scrollX;
+
+        if (newLeft + portalWidth + padding > viewportWidth) {
+          newLeft =
+            Math.max(0, viewportWidth - portalWidth - padding) + window.scrollX;
+        }
+
+        setCoords({
+          top: r.bottom + window.scrollY + gap,
+          left: newLeft,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [anchorRef]);
 
   useEffect(() => {
@@ -154,6 +207,7 @@ const DropdownPortal = ({
 
   return createPortal(
     <div
+      ref={portalRef}
       data-hn-portal="l1"
       style={{
         position: "absolute",
@@ -175,7 +229,7 @@ const DropdownPortal = ({
   );
 };
 
-// ─── Portal: L2 flyout (opens to the right of a main-menu row) ───────────────
+// ─── Portal: L2 flyout (opens to the right or left of a main-menu row) ───────
 
 interface FlyoutPortalProps {
   anchorRef: React.RefObject<HTMLDivElement>;
@@ -185,21 +239,109 @@ interface FlyoutPortalProps {
 
 const FlyoutPortal = ({ anchorRef, children, bgColor }: FlyoutPortalProps) => {
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+  const [openDirection, setOpenDirection] = useState<"right" | "left">("right");
+  const portalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!anchorRef.current) return;
-    const r = anchorRef.current.getBoundingClientRect();
-    setCoords({
-      top: r.top + window.scrollY,
-      left: r.right + window.scrollX + 4,
-    });
+
+    const calculatePosition = () => {
+      if (!anchorRef.current || !portalRef.current) return;
+
+      const r = anchorRef.current.getBoundingClientRect();
+      const portalWidth = portalRef.current.offsetWidth || 240;
+      const gap = 4;
+      const viewportWidth = window.innerWidth;
+
+      // Check if there's enough space on the right
+      const spaceOnRight = viewportWidth - (r.right + gap);
+      const hasSpaceOnRight = spaceOnRight >= portalWidth;
+
+      let newLeft: number;
+      let direction: "right" | "left";
+
+      if (hasSpaceOnRight) {
+        // Open on the right (default)
+        newLeft = r.right + window.scrollX + gap;
+        direction = "right";
+      } else {
+        // Check if there's space on the left
+        const spaceOnLeft = r.left - gap;
+        if (spaceOnLeft >= portalWidth) {
+          // Open on the left
+          newLeft = r.left + window.scrollX - portalWidth - gap;
+          direction = "left";
+        } else {
+          // Not enough space on either side, try right anyway (will overflow)
+          newLeft = r.right + window.scrollX + gap;
+          direction = "right";
+        }
+      }
+
+      setCoords({
+        top: r.top + window.scrollY,
+        left: newLeft,
+      });
+      setOpenDirection(direction);
+    };
+
+    // Calculate position on next frame to ensure portal is rendered
+    const timeoutId = setTimeout(calculatePosition, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [anchorRef]);
+
+  // Recalculate on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (anchorRef.current && portalRef.current) {
+        const r = anchorRef.current.getBoundingClientRect();
+        const portalWidth = portalRef.current.offsetWidth || 240;
+        const gap = 4;
+        const viewportWidth = window.innerWidth;
+
+        const spaceOnRight = viewportWidth - (r.right + gap);
+        const hasSpaceOnRight = spaceOnRight >= portalWidth;
+
+        let newLeft: number;
+        let direction: "right" | "left";
+
+        if (hasSpaceOnRight) {
+          newLeft = r.right + window.scrollX + gap;
+          direction = "right";
+        } else {
+          const spaceOnLeft = r.left - gap;
+          if (spaceOnLeft >= portalWidth) {
+            newLeft = r.left + window.scrollX - portalWidth - gap;
+            direction = "left";
+          } else {
+            newLeft = r.right + window.scrollX + gap;
+            direction = "right";
+          }
+        }
+
+        setCoords({
+          top: r.top + window.scrollY,
+          left: newLeft,
+        });
+        setOpenDirection(direction);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [anchorRef]);
 
   if (typeof document === "undefined") return null;
 
+  const animationName =
+    openDirection === "right" ? "hn-slide-right" : "hn-slide-left";
+
   return createPortal(
     <div
+      ref={portalRef}
       data-hn-portal="l2"
+      data-direction={openDirection}
       style={{
         position: "absolute",
         top: coords.top,
@@ -211,7 +353,7 @@ const FlyoutPortal = ({ anchorRef, children, bgColor }: FlyoutPortalProps) => {
         boxShadow: "0 8px 32px rgba(0,0,0,0.45)",
         minWidth: 240,
         padding: "6px 0",
-        animation: "hn-slide-right 0.14s ease",
+        animation: `${animationName} 0.14s ease`,
       }}
     >
       {children}
@@ -293,7 +435,7 @@ export const HorizontalNav = ({
   }, []);
 
   const { sidebarBg, hoverColor, editMode, headerMap, mainMap, subMap } = sd;
-
+  console.log("Parsed menu data:", { headerMap });
   // Close dropdowns on outside click
   useEffect(() => {
     const handle = (e: MouseEvent) => {
@@ -344,6 +486,7 @@ export const HorizontalNav = ({
       <style>{`
         @keyframes hn-slide-down  {from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
         @keyframes hn-slide-right {from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+        @keyframes hn-slide-left  {from{opacity:0;transform:translateX(6px)}to{opacity:1;transform:translateX(0)}}
         .hn-nav {
           width: 100%;
           background: ${sidebarBg};
