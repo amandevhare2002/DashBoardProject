@@ -1249,9 +1249,87 @@ export const ButtonField = ({
                       ButtonID: field.FieldID,
                     };
                     sessionStorage.setItem("buttonID", field.FieldID);
+
                     const result = await postToMultipleAPIs(field.APIURL, data);
 
-                    // Update table metadata
+                    // Check if Table is empty or API response indicates error
+                    const isTableEmpty =
+                      !result.data.Table || result.data.Table.length === 0;
+                    const hasError =
+                      result.data.Message === "Invalid Request" ||
+                      result.data.Resp?.toLowerCase() === "error";
+
+                    if (isTableEmpty || hasError) {
+                      // Reset table metadata to empty/initial state
+                      setTableMetadata({
+                        isDetailPopupOpen: false,
+                        moduleID: null,
+                        fieldID: null,
+                        defaultVisible: null,
+                        tablebuttons: null,
+                        tableWidth: null,
+                        ischeckBoxReq: null,
+                        headerData: null,
+                        footerData: null,
+                        filename: null,
+                        logo: null,
+                        tableproperty: null,
+                        outsideBorder: null,
+                        insideBorder: null,
+                        orientation: null,
+                        tableFormatting: null,
+                        headerRows: null,
+                        footerRows: null,
+                        tableheaderfooterCSS: null,
+                        pageitemscnt: null,
+                        isPagination: null,
+                        chartData: null,
+                        chartIds: null,
+                        isFreezeHeader: null,
+                        popupdrawersettings: null,
+                      });
+
+                      // Reset the buttonFields array for the relevant field
+                      const newUpdatedDetails = [...updatedPersonalDetails];
+                      const fieldID = field.FieldID;
+
+                      // Find and reset buttonFields for the matching field
+                      newUpdatedDetails.forEach((tab) => {
+                        if (tab?.Values && Array.isArray(tab.Values)) {
+                          tab.Values.forEach((fieldItem: any) => {
+                            if (fieldItem?.FieldID == fieldID) {
+                              // Clear the buttonFields array
+                              fieldItem.buttonFields = [];
+                              fieldItem.tableColumns = [];
+                              fieldItem.tableFooter = [];
+                              // Also clear TableData if it exists on the tab
+                              if (tab.TableData) {
+                                tab.TableData = [];
+                              }
+                            }
+                          });
+                        }
+                      });
+
+                      // Update state with cleared buttonFields
+                      setUpdatedPersonalDetails(
+                        JSON.parse(JSON.stringify(newUpdatedDetails)),
+                      );
+
+                      // Show appropriate message
+                      if (hasError) {
+                        toast.error(result.data.Message || "Invalid request", {
+                          style: { top: 80 },
+                        });
+                      } else if (isTableEmpty) {
+                        toast.info("No data available", { style: { top: 80 } });
+                      }
+
+                      setLoading(false);
+                      return; // Exit early if table is empty or error
+                    }
+
+                    // Update table metadata only if we have valid table data
                     setTableMetadata({
                       isDetailPopupOpen: result.data.IsDetailPopupOpen || false,
                       moduleID: result.data.Table?.[0]?.ModuleID || null,
@@ -1280,10 +1358,12 @@ export const ButtonField = ({
                       popupdrawersettings:
                         result.data.Popupdrawersettings || null,
                     });
+
                     const saveIsCheckBoxReq = sessionStorage.setItem(
                       "isCheckBoxReq",
                       result.data.IscheckBoxReq,
                     );
+
                     if (result.data.Message !== "Invalid Request") {
                       const newUpdatedDetails = [...updatedPersonalDetails];
                       const fieldID = result.data.FieldID;
@@ -1419,7 +1499,74 @@ export const ButtonField = ({
                       setUpdatedPersonalDetails(newUpdatedDetails);
                     }
                   } catch (error: any) {
-                    toast.error(error?.response?.data?.Message, {
+                    // Handle 500 error and other exceptions
+                    console.error("API Error:", error);
+
+                    // Reset table metadata to empty on error
+                    setTableMetadata({
+                      isDetailPopupOpen: false,
+                      moduleID: null,
+                      fieldID: null,
+                      defaultVisible: null,
+                      tablebuttons: null,
+                      tableWidth: null,
+                      ischeckBoxReq: null,
+                      headerData: null,
+                      footerData: null,
+                      filename: null,
+                      logo: null,
+                      tableproperty: null,
+                      outsideBorder: null,
+                      insideBorder: null,
+                      orientation: null,
+                      tableFormatting: null,
+                      headerRows: null,
+                      footerRows: null,
+                      tableheaderfooterCSS: null,
+                      pageitemscnt: null,
+                      isPagination: null,
+                      chartData: null,
+                      chartIds: null,
+                      isFreezeHeader: null,
+                      popupdrawersettings: null,
+                    });
+
+                    // Reset the buttonFields array for the relevant field on error
+                    const newUpdatedDetails = [...updatedPersonalDetails];
+                    const fieldID = field.FieldID;
+
+                    // Find and reset buttonFields for the matching field
+                    newUpdatedDetails.forEach((tab) => {
+                      if (tab?.Values && Array.isArray(tab.Values)) {
+                        tab.Values.forEach((fieldItem: any) => {
+                          if (fieldItem?.FieldID == fieldID) {
+                            // Clear the buttonFields array
+                            fieldItem.buttonFields = [];
+                            fieldItem.tableColumns = [];
+                            fieldItem.tableFooter = [];
+                            // Also clear TableData if it exists on the tab
+                            if (tab.TableData) {
+                              tab.TableData = [];
+                            }
+                          }
+                        });
+                      }
+                    });
+
+                    // Update state with cleared buttonFields
+                    setUpdatedPersonalDetails(
+                      JSON.parse(JSON.stringify(newUpdatedDetails)),
+                    );
+
+                    // Show appropriate error message
+                    const errorMessage =
+                      error?.response?.status === 500
+                        ? "Server error occurred. Please try again later."
+                        : error?.response?.data?.Message ||
+                          error?.message ||
+                          "An error occurred";
+
+                    toast.error(errorMessage, {
                       style: { top: 80 },
                     });
                   } finally {
