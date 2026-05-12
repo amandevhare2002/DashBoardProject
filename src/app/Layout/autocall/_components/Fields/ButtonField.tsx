@@ -702,35 +702,37 @@ export const ButtonField = ({
     if (!field.IsFieldNamePrint) return null;
 
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: field.Align,
-          width: "100%",
-          marginTop: "-25px",
-        }}
-      >
+      <>
         {isDrag && (
-          <AiFillEdit
-            onClick={() => {
-              setModalData({
-                app_id: field.FieldID,
-                ModuleID: information.Data[0]?.StrucureModuleID,
-                IsPopUpOpen: field.IsPopUpOpen,
-                SideDrawerPos: field.SideDrawerPos,
-                SideDrawerWidth: field.SideDrawerWidth,
-              });
-              setIsModalOpen(true);
-            }}
+          <div
             style={{
-              marginBottom: 2,
-              marginLeft: 10,
-              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: field.Align,
+              width: "100%",
+              marginTop: "-25px",
             }}
-          />
+          >
+            <AiFillEdit
+              onClick={() => {
+                setModalData({
+                  app_id: field.FieldID,
+                  ModuleID: information.Data[0]?.StrucureModuleID,
+                  IsPopUpOpen: field.IsPopUpOpen,
+                  SideDrawerPos: field.SideDrawerPos,
+                  SideDrawerWidth: field.SideDrawerWidth,
+                });
+                setIsModalOpen(true);
+              }}
+              style={{
+                marginBottom: 2,
+                marginLeft: 10,
+                cursor: "pointer",
+              }}
+            />
+          </div>
         )}
-      </div>
+      </>
     );
   };
   return field.ValueType === "EDITOR" && field?.DefaultVisible ? (
