@@ -4242,6 +4242,9 @@ const PersonalDetails = forwardRef(
         toast.error("Error loading tab data", { style: { top: 80 } });
       } finally {
         setLoading(false);
+        // Remove the tab key from the set to allow re-calling the API
+        // This prevents duplicate concurrent calls but allows repeat calls
+        apiCalledTabsRef.current.delete(tabKey);
       }
     };
 
