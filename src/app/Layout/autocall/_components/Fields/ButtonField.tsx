@@ -1222,24 +1222,43 @@ export const ButtonField = ({
                 }
                 if (confirmed) {
                   const newArray: any = [];
-                  information.Data.forEach((dataObj: any) => {
-                    dataObj?.Fields?.forEach((fieldGroup: any) => {
-                      fieldGroup?.Values?.forEach((res: any) => {
-                        field.buttonFields.forEach((response: any) => {
-                          if (
-                            Number(res.FieldID) === response.FieldID &&
-                            saveData[res.FieldName]
-                          ) {
-                            newArray.push({
-                              FieldID: res.FieldID,
-                              FieldName: res.FieldName,
-                              FieldValue: saveData[res.FieldName],
-                            });
-                          }
+
+                  updatedPersonalDetails.forEach((resData: any) => {
+                    resData?.Values?.forEach((res: any) => {
+                      if (
+                        ["BUTTON", "TABLE", "UPLOAD", "CHART"].includes(
+                          res.FieldType,
+                        )
+                      )
+                        return;
+
+                      // ✅ Strict: only include fields whose FieldID is in buttonFields
+                      const isInButtonFields = field.buttonFields.some(
+                        (bf: any) => Number(bf.FieldID) === Number(res.FieldID),
+                      );
+
+                      if (isInButtonFields) {
+                        newArray.push({
+                          FieldID: res.FieldID,
+                          FieldName: res.FieldName,
+                          FieldValue:
+                            saveData[res.FieldName] ?? res.FieldValue ?? "",
                         });
-                      });
+                      }
                     });
                   });
+
+                  // Validate at least something was collected
+                  if (newArray.length === 0) {
+                    toast.error(
+                      "No field data found. Please fill the required fields.",
+                      {
+                        style: { top: 80 },
+                      },
+                    );
+                    setLoading(false);
+                    return;
+                  }
 
                   try {
                     const data = {
@@ -1250,7 +1269,26 @@ export const ButtonField = ({
                     };
                     sessionStorage.setItem("buttonID", field.FieldID);
                     const result = await postToMultipleAPIs(field.APIURL, data);
-
+                    if (!result.data.Table || result.data.Table.length === 0) {
+                      const fieldID = result.data.FieldID;
+                      const newUpdatedDetails = [...updatedPersonalDetails];
+                      newUpdatedDetails.forEach((tab) => {
+                        if (tab?.Values && Array.isArray(tab.Values)) {
+                          tab.Values.forEach((fieldItem: any) => {
+                            if (fieldItem?.FieldID == fieldID) {
+                              fieldItem.buttonFields = [];
+                              fieldItem.tableColumns = [];
+                              fieldItem.tableFooter = [];
+                            }
+                          });
+                        }
+                      });
+                      setUpdatedPersonalDetails(
+                        JSON.parse(JSON.stringify(newUpdatedDetails)),
+                      );
+                      setLoading(false);
+                      return;
+                    }
                     // Update table metadata
                     setTableMetadata({
                       isDetailPopupOpen: result.data.IsDetailPopupOpen || false,
@@ -1419,9 +1457,29 @@ export const ButtonField = ({
                       setUpdatedPersonalDetails(newUpdatedDetails);
                     }
                   } catch (error: any) {
-                    toast.error(error?.response?.data?.Message, {
-                      style: { top: 80 },
+                    // ✅ On API failure (500 etc.), reset buttonFields for this field only
+                    const newUpdatedDetails = [...updatedPersonalDetails];
+                    newUpdatedDetails.forEach((tab) => {
+                      if (tab?.Values && Array.isArray(tab.Values)) {
+                        tab.Values.forEach((fieldItem: any) => {
+                          if (fieldItem?.FieldType === "TABLE") {
+                            fieldItem.buttonFields = [];
+                            fieldItem.tableColumns = [];
+                            fieldItem.tableFooter = [];
+                          }
+                        });
+                      }
                     });
+                    setUpdatedPersonalDetails(
+                      JSON.parse(JSON.stringify(newUpdatedDetails)),
+                    );
+
+                    toast.error(
+                      error?.response?.data?.Message || "An error occurred",
+                      {
+                        style: { top: 80 },
+                      },
+                    );
                   } finally {
                     setLoading(false);
                   }
