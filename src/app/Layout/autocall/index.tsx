@@ -902,6 +902,10 @@ const AutoCallPage = ({
         newCardData.map((res: any) => {
           if (res.tableArray.length > 0) {
             finalUpdatedArray.push(res);
+          } else {
+            toast.info(`No data found for card: ${res.CardName}`, {
+              style: { top: "110px" },
+            });
           }
         });
         setCardViewData(finalUpdatedArray);
@@ -3198,7 +3202,7 @@ const AutoCallPage = ({
                       isDrag={isDrag}
                       onDrop={moveSearchBox} // Your moveSearchBox function
                     >
-                      <div className="flex px-2 space-x-2 items-center">
+                      <div className="flex px-2 space-x-2 items-center mt-14">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                           {filterFields.map((field) => {
                             const fieldPosition = searchFieldPositions[
