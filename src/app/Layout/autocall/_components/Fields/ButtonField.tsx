@@ -568,7 +568,7 @@ export const ButtonField = ({
       width: displaySize.width,
       backgroundColor: field.Bgcolor || field.Fieldbgcolor || "",
       color: field.fontcolor || field.TextFontColor || "",
-      fontSize: field.FontSize || field.TextFontSize || "14px",
+      fontSize: `${field.FontSize}px` || `${field.TextFontSize}px` || "14px",
       fontFamily: field.Fontname || "Bookman Old Style",
       textAlign: field.Align || field.TextAlignment || "center",
       borderRadius:
