@@ -58,6 +58,7 @@ import NewTablePage from "@/utils/newTable";
 import { DynamicAdvancedTabs } from "./AdvanceTabWrapper";
 import { BoxComponent } from "./dnd/Box";
 import { StandaloneFields } from "./NonAddmoreFields";
+import { downloadBase64File } from "@/utils/download";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -4237,6 +4238,7 @@ const PersonalDetails = forwardRef(
             setUpdatedPersonalDetails(newUpdatedDetails);
           }
         }
+        downloadBase64File(result.data.Base64string, result.data.Filename);
       } catch (error) {
         console.error("Error calling API on tab change:", error);
         toast.error("Error loading tab data", { style: { top: 80 } });
