@@ -195,7 +195,7 @@ export const AppSidebar = ({
     setSearchbgColor(menuData?.Searchboxbgcolor);
     setIsMenuItems(menuData?.menuitems);
     setIsMenuHeaders(menuData?.MenuHeaders);
-    setDynamicVerticle(menuData?.DynamicVertical);
+    setDynamicVerticle(menuData?.DisplayVertical);
     console.log("sidebarData", menuData);
   }, []);
   console.log("NewMenuItems?.newHeaderList", NewMenuItems?.newHeaderList);
