@@ -76,6 +76,7 @@ export const ButtonField = ({
   isMobile,
   onClick,
 }: any) => {
+  console.log("fieldfieldfieldfield", field.FieldName);
   const [isButtonLoading, setIsButtonLoading] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isEditorDrawerOpen, setIsEditorDrawerOpen] = useState(false);
@@ -280,6 +281,7 @@ export const ButtonField = ({
       // ✅ Prepare payload
       let submitData: any = {
         Userid: localStorage.getItem("username"),
+        ButtonID: field.FieldID,
         ModuleID: menuIDQuery || menuID ? Number(menuIDQuery || menuID) : 0,
         Operation: isOpen ? "UPDATE" : currentRecordID ? "INSERT" : "UPDATE",
         fieldsDatanew: fieldData,
@@ -1288,6 +1290,10 @@ export const ButtonField = ({
                       setUpdatedPersonalDetails(
                         JSON.parse(JSON.stringify(newUpdatedDetails)),
                       );
+                      downloadBase64File(
+                        result.data.Base64string,
+                        result.data.Filename,
+                      );
                       setLoading(false);
                       return;
                     }
@@ -1603,6 +1609,10 @@ export const ButtonField = ({
                       });
                     });
                   }
+                  downloadBase64File(
+                    result.data.Base64string,
+                    result.data.Filename,
+                  );
                 } catch (error: any) {
                   toast.error(error?.response?.data?.Message, {
                     style: { top: 80 },
@@ -1816,7 +1826,7 @@ export const ButtonField = ({
             });
           }}
         >
-          {isButtonLoading ? "Submitting..." : "SUBMIT"}
+          {isButtonLoading ? "Submitting..." : field?.FieldName}
         </Button>
       </BoxComponent>
     </Resizable>

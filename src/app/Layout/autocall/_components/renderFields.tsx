@@ -1,5 +1,4 @@
 import { faCalendarAlt } from "@fortawesome/free-solid-svg-icons";
-import { Editor } from "@tinymce/tinymce-react";
 import Tooltip from "rc-tooltip";
 import { Resizable } from "re-resizable";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
@@ -33,6 +32,7 @@ import autoTable from "jspdf-autotable";
 import Tabfield from "./Fields/Tabfield";
 import Accordionfield from "./Fields/AccordionField";
 import { HyperlinkField } from "./Fields/Hperlink";
+import { TextEditorField } from "./Fields/TextEditorField";
 
 export const RenderFields = ({
   updatedPersonalDetails,
@@ -765,148 +765,20 @@ export const RenderFields = ({
 
           case "TEXTEDITOR":
             return (
-              <Resizable
-                enable={{
-                  top: isDrag,
-                  right: isDrag,
-                  bottom: isDrag,
-                  left: isDrag,
-                }}
-                className="resizer"
-                style={{ ...style, padding: 0 }}
-                size={{
-                  width: mobileLayout
-                    ? "100%"
-                    : `${Number(
-                        field?.Width?.toString().split("px")[0] || 100,
-                      )}px`,
-                  height: `${Number(
-                    field?.Height?.toString().split("px")[0] || 100,
-                  )}px`,
-                }}
-              >
-                <FormGroup
-                  key={field?.FieldName}
-                  style={{
-                    textAlign: field.Align,
-                    display: "flex",
-                    flexDirection: field.LabelDirection,
-                  }}
-                  className={className}
-                >
-                  <BoxComponent
-                    key={field.FieldID}
-                    id={field.FieldID}
-                    left={field.Rownum}
-                    top={field.Colnum}
-                    isDrag={isDrag}
-                    width={mobileLayout ? "100%" : `${field.Width}px`}
-                    height={`${field.Height}px`}
-                    newStyle={{
-                      display: "flex",
-                      alignItems: "center",
-                      flexDirection: field.LabelDirection,
-                      gap: 4,
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        marginTop: "-25px",
-                      }}
-                    >
-                      <Label
-                        for={field?.FieldName}
-                        className="bold max-w-fit"
-                        style={{
-                          color: field.fontcolor,
-                          fontWeight: field.IsBold ? 700 : "normal",
-                          textDecoration: field.IsUnderline
-                            ? "underline"
-                            : "none",
-                          fontStyle: field.IsItallic ? "italic" : "normal",
-                          fontSize: `${field.FontSize}px`,
-                          fontFamily: field.Fontname,
-                        }}
-                      >
-                        {field?.FieldName}{" "}
-                        {field.IsMandatory ? (
-                          <span style={{ color: "red" }}>*</span>
-                        ) : null}
-                      </Label>
-                      {field.ToolTip && (
-                        <Tooltip overlay={<Label>{field.ToolTip}</Label>}>
-                          <div
-                            style={{
-                              display: "flex",
-                              gap: 2,
-                              alignItems: "center",
-                            }}
-                          >
-                            <AiFillInfoCircle
-                              style={{
-                                marginBottom: 2,
-                                marginLeft: 10,
-                                cursor: "pointer",
-                              }}
-                            />
-                          </div>
-                        </Tooltip>
-                      )}
-                      {isDrag && field.IsEdit && (
-                        <AiFillEdit
-                          onClick={() => {
-                            setModalData({
-                              app_id: field.FieldID,
-                              ModuleID: information.Data[0]?.StrucureModuleID,
-                              IsPopUpOpen: field.IsPopUpOpen,
-                              SideDrawerPos: field.SideDrawerPos,
-                              SideDrawerWidth: field.SideDrawerWidth,
-                            });
-                            setIsModalOpen(true);
-                          }}
-                          style={{
-                            marginBottom: 2,
-                            marginLeft: 10,
-                            cursor: "pointer",
-                          }}
-                        />
-                      )}
-                    </div>
-                    <Editor
-                      onInit={(evt: any, editor: any) =>
-                        (editorRef.current = editor)
-                      }
-                      apiKey="8s3fkrr9r5ylsjtqbesp0wk79pn46g4do9p1dg9249yn8tx5"
-                      onEditorChange={(content: any) => {
-                        let state = {
-                          ...saveData,
-                          [field.FieldName]: content,
-                        };
-                        setSaveData(state);
-                      }}
-                      value={saveData[field.FieldName] ?? ""}
-                      init={{
-                        height: `${field.Height}px`,
-                        width: `${mobileLayout ? field.MWidth : field.Width}px`,
-                        border: showBorder
-                          ? `1px solid ${borderColor}`
-                          : "none",
-                        menubar: true,
-                        plugins: [
-                          "advlist autolink lists link image charmap print preview anchor ",
-                          "searchreplace visualblocks code fullscreen",
-                          "insertdatetime media  paste code help wordcount",
-                        ],
-                        content_style: `body {font - family:Helvetica,Arial,sans-serif; font-size:14px; height: ${
-                          field.Height
-                        }px; width: ${mobileLayout ? "100%" : field.Width}px;}`,
-                      }}
-                    />
-                  </BoxComponent>
-                </FormGroup>
-              </Resizable>
+              <TextEditorField
+                style={style}
+                field={fieldProps}
+                onResize={onResize}
+                isModify={isModify}
+                isDrag={isDrag}
+                setModalData={setModalData}
+                setIsModalOpen={setIsModalOpen}
+                information={information}
+                saveData={saveData}
+                setSaveData={setSaveData}
+                editorRef={editorRef}
+                mobileLayout={mobileLayout}
+              />
             );
           case "IMAGE":
             return (

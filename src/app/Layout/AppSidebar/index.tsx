@@ -134,6 +134,7 @@ export const AppSidebar = ({
     }
     return submenu;
   }, [menuItems]);
+  console.log("submenusubmenusubmenu", subMenuArray);
 
   let NewMenuItems = useMemo(() => {
     if (!keySearch) {
@@ -275,7 +276,7 @@ export const AppSidebar = ({
               })}
               style={{
                 backgroundColor: sidebarData,
-                zIndex: dynamicVertical ? 9999 : 9,
+                // zIndex: dynamicVertical ? 9999 : 9,
               }}
               appear={true}
               enter={false}
