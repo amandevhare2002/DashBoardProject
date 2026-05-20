@@ -316,6 +316,8 @@ export function DropDownField({
             chartData: resData.ChartData || null,
             chartIds: resData.Chartids || null,
             chartType: resData.ChartType || "",
+            isOpenonTables: result.data.IsOpenonTables || false,
+            isOpenwithTabs: result.data.IsOpenwithTabs || false,
           });
         }
 
@@ -633,11 +635,25 @@ export function DropDownField({
                             : "0",
                   };
                 },
+                valueContainer: (baseStyles) => ({
+                  ...baseStyles,
+                }),
                 placeholder: (baseStyles) => ({
                   ...baseStyles,
                   color: hasError ? "#dc3545" : "#6c757d",
                 }),
-
+                indicatorsContainer: (baseStyles) => ({
+                  ...baseStyles,
+                  padding: "2px 8px",
+                }),
+                clearIndicator: (baseStyles) => ({
+                  ...baseStyles,
+                  padding: "4px",
+                }),
+                dropdownIndicator: (baseStyles) => ({
+                  ...baseStyles,
+                  padding: "4px",
+                }),
                 menuPortal: (baseStyles) => ({
                   ...baseStyles,
                   zIndex: 9999,

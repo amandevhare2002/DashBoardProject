@@ -100,6 +100,12 @@ export const RenderFields = ({
   // ✅ CRITICAL FIX: Accept selectedRowsByTable and callback from parent
   selectedRowsByTable,
   onTableSelectionChanged,
+  onTableTabAdded,
+  onTableTabClosed,
+  onTableTabSelected,
+  onTableTabsCleared,
+  tableTabs,
+  selectedTableTabId,
 }: any) => {
   const [mobileLayout, setMobileLayout] = useState(isMobile);
   // Restore selected rows from localStorage on mount and when value (tab) changes
@@ -519,6 +525,8 @@ export const RenderFields = ({
                 isPagination={tableMetadata.isPagination}
                 pageitemscnt={tableMetadata.pageitemscnt}
                 isFreezeHeader={tableMetadata.isFreezeHeader}
+                isOpenwithTabs={tableMetadata.isOpenwithTabs}
+                isOpenonTables={tableMetadata.isOpenonTables}
                 uploadedFiles={uploadedFiles}
                 setUploadedFiles={setUploadedFiles}
                 handleSubmit={handleSubmit}
@@ -553,6 +561,12 @@ export const RenderFields = ({
                 setSaveData={setSaveData}
                 setIsModalOpen={setIsModalOpen}
                 setModalData={setModalData}
+                onTabAdded={onTableTabAdded}
+                onTabClosed={onTableTabClosed}
+                onTabSelected={onTableTabSelected}
+                onTabsCleared={onTableTabsCleared}
+                externalTabs={tableTabs}
+                externalSelectedTabId={selectedTableTabId}
               />
             ) : null;
 

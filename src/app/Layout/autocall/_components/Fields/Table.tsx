@@ -75,6 +75,14 @@ export function TableField({
   setSaveData,
   setIsModalOpen,
   setModalData,
+  onTabAdded, // Add these props
+  onTabClosed,
+  onTabSelected,
+  onTabsCleared,
+  externalTabs,
+  externalSelectedTabId,
+  isOpenwithTabs,
+  isOpenonTables,
 }: any) {
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
 
@@ -639,6 +647,8 @@ export function TableField({
 
     prevWsDataLengthRef.current = newLen;
   }, [wsData]);
+  const shouldUseExternalTabs =
+    isOpenwithTabs || field?.IsOpenwithTabs === true;
 
   return (
     <Resizable
@@ -888,6 +898,17 @@ export function TableField({
               autopopupdrawer={autopopupdrawer}
               setTableMetadata={setTableMetadata}
               setSaveData={setSaveData}
+              isOpenonTables={field?.IsOpenonTables || isOpenonTables || false}
+              isOpenwithTabs={field?.IsOpenwithTabs || isOpenwithTabs || false}
+              // Pass callbacks only if IsOpenwithTabs is true (parent manages)
+              {...(shouldUseExternalTabs && {
+                onTabAdded,
+                onTabClosed,
+                onTabSelected,
+                onTabsCleared,
+                externalTabs,
+                externalSelectedTabId,
+              })}
             />
           </div>
         </BoxComponent>

@@ -206,6 +206,219 @@ const PersonalDetails = forwardRef(
 
     // ✅ UNDO SYSTEM: Track field state history for undo functionality
     const [undoHistory, setUndoHistory] = useState<any[]>([]);
+    const [liftedTableTabs, setLiftedTableTabs] = useState<any[]>([]);
+    const [liftedSelectedTabId, setLiftedSelectedTabId] = useState<
+      string | null
+    >(null);
+
+    // Modal state for opened tabs (similar to existing modalData but for table tabs)
+    const [tableTabModalOpen, setTableTabModalOpen] = useState(false);
+    const [tableTabModalData, setTableTabModalData] = useState<any>(null);
+
+    // Function to open modal for a specific tab
+    const openModalForTableTab = useCallback((tab: any) => {
+      setTableTabModalData({
+        app_id: tab.recordID,
+        ModuleID: tab.moduleID,
+        defaultVisible: tab.defaultVisible,
+        timelineData: tab.rowData?.timelineData,
+      });
+      setTableTabModalOpen(true);
+    }, []);
+
+    const handleTableTabAdded = useCallback(
+      (tab: any) => {
+        setLiftedTableTabs((prev) => {
+          // Check if tab already exists
+          const exists = prev.some((t) => t.id === tab.id);
+          if (exists) return prev;
+          return [...prev, tab];
+        });
+        setLiftedSelectedTabId(tab.id);
+        // Open modal for the new tab
+        openModalForTableTab(tab);
+      },
+      [openModalForTableTab],
+    );
+
+    const handleTableTabClosed = useCallback(
+      (tabId: string) => {
+        setLiftedTableTabs((prev) => {
+          const newTabs = prev.filter((tab) => tab.id !== tabId);
+          if (liftedSelectedTabId === tabId) {
+            if (newTabs.length > 0) {
+              setLiftedSelectedTabId(newTabs[0].id);
+              // Open modal for the next tab
+              openModalForTableTab(newTabs[0]);
+            } else {
+              setLiftedSelectedTabId(null);
+              setTableTabModalOpen(false);
+              setTableTabModalData(null);
+            }
+          }
+          return newTabs;
+        });
+      },
+      [liftedSelectedTabId, openModalForTableTab],
+    );
+
+    const handleTableTabSelected = useCallback(
+      (tabId: string) => {
+        setLiftedSelectedTabId(tabId);
+        const selectedTab = liftedTableTabs.find((tab) => tab.id === tabId);
+        if (selectedTab) {
+          openModalForTableTab(selectedTab);
+        }
+      },
+      [liftedTableTabs, openModalForTableTab],
+    );
+
+    const handleTableTabsCleared = useCallback(() => {
+      setLiftedTableTabs([]);
+      setLiftedSelectedTabId(null);
+      setTableTabModalOpen(false);
+      setTableTabModalData(null);
+    }, []);
+
+    // Check if any table field has IsOpenwithTabs true
+    const hasOpenWithTabs = useMemo(() => {
+      if (!updatedPersonalDetails) return false;
+
+      for (const tab of updatedPersonalDetails) {
+        if (tab?.Values) {
+          for (const field of tab.Values) {
+            if (field.FieldType === "TABLE" && field.IsOpenwithTabs === true) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    }, [updatedPersonalDetails]);
+
+    // Render the tab bar component (similar to the one from NewTablePage)
+    const renderLiftedTabBar = () => {
+      if (!hasOpenWithTabs || liftedTableTabs.length === 0) return null;
+
+      return (
+        <div
+          className="mb-3"
+          style={{
+            borderBottom: "1px solid #dee2e6",
+            backgroundColor: "#fff",
+            marginBottom: "16px",
+            marginTop: "16px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "8px 12px",
+              backgroundColor: "#f8f9fa",
+              borderRadius: "8px 8px 0 0",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "#6c757d",
+                  fontWeight: 500,
+                }}
+              >
+                📑 Open Entries ({liftedTableTabs.length}):
+              </span>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {liftedTableTabs.map((tab) => (
+                  <div
+                    key={tab.id}
+                    onClick={() => handleTableTabSelected(tab.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "4px 8px 4px 12px",
+                      backgroundColor:
+                        liftedSelectedTabId === tab.id ? "#007bff" : "#e9ecef",
+                      color:
+                        liftedSelectedTabId === tab.id ? "#fff" : "#495057",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      transition: "all 0.2s ease",
+                      border:
+                        liftedSelectedTabId === tab.id
+                          ? "none"
+                          : "1px solid #dee2e6",
+                    }}
+                  >
+                    <span
+                      style={{
+                        maxWidth: "200px",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {tab.name}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTableTabClosed(tab.id);
+                      }}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "16px",
+                        fontWeight: "bold",
+                        color:
+                          liftedSelectedTabId === tab.id ? "#fff" : "#6c757d",
+                        padding: "0 2px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        marginLeft: "4px",
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {liftedTableTabs.length > 0 && (
+              <button
+                onClick={handleTableTabsCleared}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#dc3545",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  padding: "4px 8px",
+                  borderRadius: "4px",
+                }}
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+        </div>
+      );
+    };
 
     // Callback to update selected rows from child tables
     const handleTableSelectionChanged = (
@@ -325,6 +538,8 @@ const PersonalDetails = forwardRef(
         popupwidth: "",
         Pos_Trans: "",
       },
+      isOpenwithTabs: false,
+      isOpenonTables: false,
     });
     const [isButtonLoading, setIsButtonLoading] = useState(false);
     const style = {
@@ -4192,6 +4407,8 @@ const PersonalDetails = forwardRef(
                 chartType: result.data.ChartType || "",
                 isFreezeHeader: result.data.IsFreezeHeader || false,
                 popupdrawersettings: result.data.popupdrawersettings || null,
+                isOpenonTables: result.data.IsOpenonTables || false,
+                isOpenwithTabs: result.data.IsOpenwithTabs || false,
               });
             }
 
@@ -5219,6 +5436,12 @@ const PersonalDetails = forwardRef(
                                 onTableSelectionChanged={
                                   handleTableSelectionChanged
                                 }
+                                onTableTabAdded={handleTableTabAdded}
+                                onTableTabClosed={handleTableTabClosed}
+                                onTableTabSelected={handleTableTabSelected}
+                                onTableTabsCleared={handleTableTabsCleared}
+                                tableTabs={liftedTableTabs}
+                                selectedTableTabId={liftedSelectedTabId}
                               />
                             </div>
                             {updatedPersonalDetails[value]?.ds !== null && (
@@ -5402,6 +5625,7 @@ const PersonalDetails = forwardRef(
                       )}
                     </div>
                   )}
+                {hasOpenWithTabs && renderLiftedTabBar()}
 
                 <CustomTabPanel value={value} index={value}>
                   {updatedPersonalDetails?.[value]?.IsTableDisplay ? (
@@ -5988,6 +6212,12 @@ const PersonalDetails = forwardRef(
                         // ✅ CRITICAL FIX: Pass selected rows state and callback
                         selectedRowsByTable={selectedRowsByTable}
                         onTableSelectionChanged={handleTableSelectionChanged}
+                        onTableTabAdded={handleTableTabAdded}
+                        onTableTabClosed={handleTableTabClosed}
+                        onTableTabSelected={handleTableTabSelected}
+                        onTableTabsCleared={handleTableTabsCleared}
+                        tableTabs={liftedTableTabs}
+                        selectedTableTabId={liftedSelectedTabId}
                       />
                       {/* {uploadedFiles?.length > 0 && (
                       <Table bordered responsive>
@@ -6161,6 +6391,12 @@ const PersonalDetails = forwardRef(
                         // ✅ CRITICAL FIX: Pass selected rows state and callback
                         selectedRowsByTable={selectedRowsByTable}
                         onTableSelectionChanged={handleTableSelectionChanged}
+                        onTableTabAdded={handleTableTabAdded}
+                        onTableTabClosed={handleTableTabClosed}
+                        onTableTabSelected={handleTableTabSelected}
+                        onTableTabsCleared={handleTableTabsCleared}
+                        tableTabs={liftedTableTabs}
+                        selectedTableTabId={liftedSelectedTabId}
                       />
                     </div>
                   )}
@@ -6231,6 +6467,56 @@ const PersonalDetails = forwardRef(
             </CustomTabPanel>
           </Card>
         )}
+        <Modal
+          isOpen={tableTabModalOpen}
+          centered
+          closeOnEsc
+          backdrop={false}
+          fullscreen={true}
+          onClose={() => {
+            setTableTabModalOpen(false);
+            setTableTabModalData(null);
+          }}
+          style={{
+            top: "50px",
+            height: `${tableMetadata.popupdrawersettings?.popheight}vh`,
+            width: `${tableMetadata.popupdrawersettings?.popupwidth}%`,
+            ...(tableMetadata.popupdrawersettings?.Pos_Trans === "CENTER" && {
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+            }),
+          }}
+        >
+          <ModalBody>
+            <div
+              style={{
+                width: "100%",
+                display: "flex",
+                justifyContent: "flex-end",
+                marginBottom: 5,
+              }}
+            >
+              <Button
+                className="b0"
+                onClick={() => {
+                  setTableTabModalOpen(false);
+                  setTableTabModalData(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+            <div>
+              <AutoCallPage
+                recordID={tableTabModalData?.app_id}
+                moduleID={tableTabModalData?.ModuleID}
+                isModalOpen={tableTabModalOpen}
+                defaultVisible={tableTabModalData?.defaultVisible}
+              />
+            </div>
+          </ModalBody>
+        </Modal>
       </>
     );
   },

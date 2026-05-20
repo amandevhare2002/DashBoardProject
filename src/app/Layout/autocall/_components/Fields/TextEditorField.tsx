@@ -152,6 +152,7 @@ export function TextEditorField({
               value={saveData[field.FieldName] ?? ""}
               init={{
                 body: saveData[field.FieldName] ?? "",
+
                 draftKey: `texteditor-${field.FieldID}-${Date.now()}`,
               }}
               showHeaderFields={false}

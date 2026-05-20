@@ -109,7 +109,7 @@ function SortIcon({ active, desc }: { active: any; desc?: boolean }) {
   );
 }
 
-// Add these interfaces to your existing interfaces section
+// Add these interfaces
 interface ApplyToAllState {
   [columnId: string]: {
     enabled: boolean;
@@ -131,9 +131,19 @@ interface ButtonConfig {
   iconclscolor?: string;
   visibility?: boolean;
   buttonFields?: any[];
-  handler?: (button: any, row?: any) => void; // Dynamic handler function
-  condition?: (state: any) => boolean; // Condition to show/enable button
-  tooltip?: string; // Tooltip text
+  handler?: (button: any, row?: any) => void;
+  condition?: (state: any) => boolean;
+  tooltip?: string;
+}
+
+// Tab interface for opened entries
+interface TableTab {
+  id: string;
+  name: string;
+  recordID: string;
+  moduleID: string;
+  defaultVisible?: any;
+  rowData?: any;
 }
 
 interface NewTableProps {
@@ -170,7 +180,6 @@ interface NewTableProps {
   onSelectionChanged?: (selectedRows: any[]) => void;
   selectedRows?: any[];
   filename?: string;
-  // ischeckBoxReq?: boolean;
   logo?: any;
   tableproperty?: any;
   insideBorder?: boolean;
@@ -182,10 +191,10 @@ interface NewTableProps {
   tableheaderfooterCSS?: any;
   onSelectedColumnsChange?: (selectedColumns: string[]) => void;
   userEmail?: string;
-  tablebuttons?: any[]; // Add tablebuttons prop
-  uploadedFiles?: any[]; // Add uploadedFiles prop
-  setUploadedFiles?: (files: any[]) => void; // Add setUploadedFiles prop
-  currentRecordID?: string; // Add currentRecordID prop
+  tablebuttons?: any[];
+  uploadedFiles?: any[];
+  setUploadedFiles?: (files: any[]) => void;
+  currentRecordID?: string;
   fieldID?: string;
   onTableDataUpdate?: (updatedData: any[], fieldID?: string) => void;
   tableBtnInfo?: any[];
@@ -194,7 +203,7 @@ interface NewTableProps {
   columnOrder?: string[];
   onLinkClick?: (rowData: any) => void;
   isFreezeHeader?: boolean;
-  isEditMode?: boolean; // Add this prop
+  isEditMode?: boolean;
   onEditModeChange?: (isEditMode: boolean) => void;
   updatedPersonalDetails?: any;
   saveData?: any;
@@ -202,6 +211,14 @@ interface NewTableProps {
   autopopupdrawer?: any;
   setTableMetadata?: any;
   setSaveData?: any;
+  isOpenonTables?: boolean; // Add this
+  isOpenwithTabs?: boolean; // Add this
+  onTabAdded?: (tab: TableTab) => void; // Callback for adding tabs
+  onTabClosed?: (tabId: string) => void; // Callback for closing tabs
+  onTabSelected?: (tabId: string) => void; // Callback for selecting tabs
+  onTabsCleared?: () => void; // Callback for clearing all tabs
+  externalTabs?: TableTab[]; // Tabs managed by parent
+  externalSelectedTabId?: string | null;
 }
 
 interface LinkModalData {
@@ -255,7 +272,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
   information,
   onSelectionChanged,
   filename,
-  // ischeckBoxReq = false,
   logo,
   tableproperty,
   insideBorder,
@@ -267,10 +283,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
   tableheaderfooterCSS,
   onSelectedColumnsChange,
   userEmail,
-  tablebuttons = [], // Default to empty array
-  uploadedFiles = [], // Default to empty array
-  setUploadedFiles, // Optional function
-  currentRecordID, // Optional
+  tablebuttons = [],
+  uploadedFiles = [],
+  setUploadedFiles,
+  currentRecordID,
   fieldID,
   onTableDataUpdate,
   field,
@@ -278,7 +294,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
   isPagination,
   pageitemscnt,
   isFreezeHeader,
-  isEditMode: externalEditMode = false, // New prop
+  isEditMode: externalEditMode = false,
   onEditModeChange,
   updatedPersonalDetails,
   saveData,
@@ -286,20 +302,171 @@ const NewTablePage: React.FC<NewTableProps> = ({
   autopopupdrawer,
   setTableMetadata,
   setSaveData,
+  isOpenonTables = false,
+  isOpenwithTabs = false,
+  onTabAdded,
+  onTabClosed,
+  onTabSelected,
+  onTabsCleared,
+  externalTabs = [],
+  externalSelectedTabId = null,
 }) => {
+  console.log("🚀 NewTablePage Props:", {
+    externalTabs,
+  });
   const tableInstanceKey = useMemo(() => {
     return `table_${moduleID}_${fieldID}_${field?.FieldID}_${JSON.stringify(
       columns?.map((c) => c.name),
     )}`;
   }, [moduleID, fieldID, field?.FieldID, columns]);
+
   const ischeckBoxReq = useMemo(() => {
     const value = sessionStorage.getItem("isCheckBoxReq");
-    // Convert string to boolean properly
-    return value === "true"; // Only true if string is exactly "true"
+    return value === "true";
   }, []);
-  // Load saved selection state BEFORE initializing rows
+
+  // ==================== TAB STATE MANAGEMENT ====================
+  const [internalTabs, setInternalTabs] = useState<TableTab[]>([]);
+  const [internalSelectedTabId, setInternalSelectedTabId] = useState<
+    string | null
+  >(null);
+  const isExternallyManaged = externalTabs.length > 0 || !!onTabAdded;
+
+  // Use either external or internal state
+  const tableTabs = externalTabs.length > 0 ? externalTabs : internalTabs;
+  const selectedTableTabId = externalSelectedTabId || internalSelectedTabId;
+
+  // Function to add a new tab when clicking a link
+  const addTableTab = useCallback(
+    (
+      recordID: string,
+      moduleID: string,
+      defaultVisible?: any,
+      rowData?: any,
+      tabName?: string,
+    ) => {
+      const tabId = `${moduleID}_${recordID}`;
+
+      // Check if tab already exists in external or internal tabs
+      const existingTab = isExternallyManaged
+        ? externalTabs.find((tab) => tab.id === tabId)
+        : tableTabs.find((tab) => tab.id === tabId);
+
+      if (existingTab) {
+        // Tab exists, just select it
+        if (onTabSelected) {
+          onTabSelected(tabId);
+        } else if (!isExternallyManaged) {
+          setInternalSelectedTabId(tabId);
+          // Only open modal internally if not externally managed
+          openModalForTab(existingTab);
+        }
+        return;
+      }
+
+      // Create new tab
+      const displayName =
+        tabName || `${rowData?.[Object.keys(rowData)[0]] || recordID}`;
+
+      const newTab: TableTab = {
+        id: tabId,
+        name:
+          displayName.length > 50
+            ? displayName.substring(0, 50) + "..."
+            : displayName,
+        recordID,
+        moduleID,
+        defaultVisible,
+        rowData,
+      };
+
+      // Use callback if provided (parent will handle modal)
+      if (onTabAdded) {
+        onTabAdded(newTab);
+        if (onTabSelected) {
+          onTabSelected(tabId);
+        }
+      } else {
+        // Internal management - handle modal here
+        setInternalTabs((prev) => [...prev, newTab]);
+        setInternalSelectedTabId(tabId);
+        openModalForTab(newTab);
+      }
+    },
+    [externalTabs, tableTabs, onTabAdded, onTabSelected, isExternallyManaged],
+  );
+
+  // Function to open modal for a specific tab
+  const openModalForTab = useCallback((tab: TableTab) => {
+    setModalData({
+      app_id: tab.recordID,
+      ModuleID: tab.moduleID,
+      defaultVisible: tab.defaultVisible,
+      timelineData: tab.rowData?.timelineData,
+    });
+    setIsModalOpen(true);
+  }, []);
+
+  // Function to close a specific tab
+  const closeTableTab = useCallback(
+    (tabId: string, e?: React.MouseEvent) => {
+      if (e) {
+        e.stopPropagation();
+      }
+
+      if (onTabClosed) {
+        onTabClosed(tabId);
+      } else if (!isExternallyManaged) {
+        // Internal cleanup logic
+        setInternalTabs((prev) => {
+          const newTabs = prev.filter((tab) => tab.id !== tabId);
+
+          if (internalSelectedTabId === tabId) {
+            if (newTabs.length > 0) {
+              setInternalSelectedTabId(newTabs[0].id);
+              openModalForTab(newTabs[0]);
+            } else {
+              setInternalSelectedTabId(null);
+              setIsModalOpen(false);
+              setModalData(null);
+            }
+          }
+
+          return newTabs;
+        });
+      }
+    },
+    [internalSelectedTabId, onTabClosed, isExternallyManaged],
+  );
+
+  // Modified clearAllTabs function
+  const clearAllTabs = useCallback(() => {
+    if (onTabsCleared) {
+      onTabsCleared();
+    } else if (!isExternallyManaged) {
+      setInternalTabs([]);
+      setInternalSelectedTabId(null);
+      setIsModalOpen(false);
+      setModalData(null);
+    }
+  }, [onTabsCleared, isExternallyManaged]);
+
+  // Function to handle tab click
+  const handleTableTabClick = useCallback(
+    (tab: TableTab) => {
+      if (onTabSelected) {
+        onTabSelected(tab.id);
+      } else if (!isExternallyManaged) {
+        setInternalSelectedTabId(tab.id);
+        openModalForTab(tab);
+      }
+    },
+    [onTabSelected, isExternallyManaged],
+  );
+
+  // ==================== EXISTING STATE ====================
+  // Load saved selection state
   useEffect(() => {
-    // Try to load saved selection from localStorage
     try {
       const saved = localStorage.getItem(`${tableInstanceKey}_selectedRows`);
       if (saved) {
@@ -307,12 +474,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
         const savedTime = parsed._timestamp || 0;
         const currentTime = Date.now();
 
-        // Keep selection for longer (e.g., 2 hours instead of 30 minutes)
         if (currentTime - savedTime < 2 * 60 * 60 * 1000) {
           const savedRows = parsed.rows || [];
           setSelectedRows(savedRows);
 
-          // Sync the selected state with saved rows
           const newSelected: Record<string, boolean> = {};
           savedRows.forEach((row: any) => {
             if (row.id) {
@@ -328,15 +493,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
   }, [tableInstanceKey]);
 
   const [rows, setRows] = useState<any[]>(() => {
-    // Try to load from localStorage first for persistence
     try {
       const saved = localStorage.getItem(tableInstanceKey);
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Check if saved data is still valid (not too old)
         const savedTime = parsed._timestamp || 0;
         const currentTime = Date.now();
-        // Keep data for 30 minutes
         if (currentTime - savedTime < 30 * 60 * 1000) {
           return parsed.rows || [];
         }
@@ -345,7 +507,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       console.error("Error loading saved rows:", error);
     }
 
-    // Initialize from TableArray
     if (TableArray && TableArray.length > 0) {
       return TableArray.map((row, index) => ({
         ...row,
@@ -357,6 +518,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     return [];
   });
+
   const [cols, setCols] = useState<any[]>([]);
   const [visible, setVisible] = useState<Record<string, boolean>>({});
   const [filters, setFilters] = useState<any>({
@@ -380,7 +542,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
   const [pageSize, setPageSize] = useState(pageitemscnt || 10);
   const [virtualize, setVirtualize] = useState(false);
   const [qLive, setQLive] = useState("");
-  // Per-column filters (keyed by column id)
   const [columnFilters, setColumnFilters] = useState<Record<string, any>>({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalData, setModalData] = useState<any>(null);
@@ -433,7 +594,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     rowId: null,
   });
 
-  // Add state to track edited cell
   const [recentlyEditedCell, setRecentlyEditedCell] = useState<{
     columnId: string | null;
     rowId: string | null;
@@ -462,11 +622,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     } catch (error) {
       console.error("Error loading saved selected rows:", error);
     }
-
     return [];
   });
-
-  console.log("Initial selected rows:", selectedRows);
 
   const loadSavedSelection = (): Record<string, boolean> => {
     try {
@@ -483,27 +640,24 @@ const NewTablePage: React.FC<NewTableProps> = ({
     } catch (error) {
       console.error("Error loading saved selection:", error);
     }
-
     return {};
   };
+
   const [selected, setSelected] = useState<Record<string, boolean>>(() => {
     return loadSavedSelection();
   });
-  console.log("Initial selected:", selected);
 
+  // ==================== EXISTING EFFECTS ====================
   useEffect(() => {
-    // When selected changes, update selectedRows to match
     const selectedIds = Object.keys(selected).filter((id) => selected[id]);
     const newSelectedRows = rows.filter((row) => selectedIds.includes(row.id));
 
-    // Only update if there's a mismatch
     if (
       JSON.stringify(newSelectedRows.map((r) => r.id)) !==
       JSON.stringify(selectedRows.map((r) => r.id))
     ) {
       setSelectedRows(newSelectedRows);
 
-      // Save to localStorage
       try {
         localStorage.setItem(
           `${tableInstanceKey}_selectedRows`,
@@ -516,7 +670,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         console.error("Error saving selected rows:", error);
       }
 
-      // Notify parent
       if (onSelectionChanged) {
         onSelectionChanged(newSelectedRows);
       }
@@ -526,12 +679,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
   useEffect(() => {
     const saveRows = () => {
       try {
-        // Only save if we have rows
         if (rows.length > 0) {
           const dataToSave = {
             rows: rows.map((r) => ({
               ...r,
-              // Remove temporary properties that shouldn't be persisted
               __isFromTableArray: undefined,
             })),
             _timestamp: Date.now(),
@@ -543,15 +694,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     };
 
-    // Debounce the save to prevent too many writes
     const timer = setTimeout(saveRows, 500);
     return () => clearTimeout(timer);
   }, [rows, tableInstanceKey]);
 
-  // Add this useEffect to process the tableBtnInfo prop
   useEffect(() => {
     if (tableBtnInfo && Array.isArray(tableBtnInfo)) {
-      // Filter buttons based on visibility
       const visibleButtons = tableBtnInfo.filter(
         (btn) => btn.visibility !== false,
       );
@@ -568,13 +716,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
     setPage(1);
   }, [isPagination, pageitemscnt]);
 
-  // Create a helper function to get button styles based on tableBtnInfo
+  // ==================== BUTTON HANDLERS ====================
   const getButtonStyle = (
     buttonName: string,
     buttonConfig: any = null,
     isDisabled = false,
   ) => {
-    // Find button config if not provided
     const btnConfig =
       buttonConfig ||
       tableButtons.find(
@@ -591,7 +738,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       };
     }
 
-    // Special styling based on button name
     if (buttonName === "Add Row") {
       if (selectedRows.length > 0) {
         return {
@@ -617,7 +763,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     }
 
-    // Handle button shape
     let borderRadius = "4px";
     if (btnConfig.buttonshape === "ROUNDED") {
       borderRadius = "8px";
@@ -653,32 +798,22 @@ const NewTablePage: React.FC<NewTableProps> = ({
         : {},
     };
   };
-  // Helper function to render icon with color
+
   const renderButtonIcon = (buttonConfig: any) => {
     if (!buttonConfig?.iconcls) return null;
-
-    // You can use react-icons or any other icon library
-    // This is a simple example - adjust based on your icon system
     const iconStyle = {
       color:
         buttonConfig.iconclscolor || buttonConfig.buttonfontcolor || "#FFFFFF",
       marginRight: "4px",
       fontSize: buttonConfig.buttonfontsize,
     };
-
-    // If using Font Awesome or similar with class names
     return <i className={buttonConfig.iconcls} style={iconStyle} />;
-
-    // Alternative: If you need to map to specific components
-    // const IconComponent = iconMap[buttonConfig.iconcls];
-    // return IconComponent ? <IconComponent style={iconStyle} /> : null;
   };
-  // Helper function to create a deep copy of rows
+
   const createSnapshot = (rowsData: any[]): any[] => {
     return rowsData.map((row) => ({ ...row }));
   };
 
-  // Save current state to history
   const saveToHistory = (state: HistoryState) => {
     const snapshot: HistoryState = {
       rows: createSnapshot(state.rows),
@@ -687,15 +822,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
       editedValues: state.editedValues ? { ...state.editedValues } : undefined,
     };
 
-    // If we're not at the latest history index, remove future states
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(snapshot);
 
     setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
-    setFuture([]); // Clear redo stack when new action is performed
+    setFuture([]);
 
-    // Limit history size (optional)
     if (newHistory.length > 50) {
       setHistory(newHistory.slice(1));
       setHistoryIndex((prev) => prev - 1);
@@ -712,7 +845,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         editedValues: { ...editedValues },
       };
 
-      // Save current state to future (redo) stack
       setFuture((prev) => [currentState, ...prev]);
 
       setRows(previousState.rows);
@@ -730,7 +862,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Redo function
   const handleRedo = () => {
     if (future.length > 0) {
       const nextState = future[0];
@@ -741,10 +872,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
         editedValues: { ...editedValues },
       };
 
-      // Save current state to history
       const newHistory = [...history.slice(0, historyIndex + 1), currentState];
 
-      // Apply next state from future
       setRows(nextState.rows);
       setSelected(nextState.selected);
       setSelectedRows(nextState.selectedRows);
@@ -762,47 +891,38 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // 6. Memoize the rows data
   const memoizedRows = useMemo(() => rows, [JSON.stringify(rows)]);
+
   useEffect(() => {
     if (!TableArray || TableArray.length === 0) {
       return;
     }
 
-    // Create a map of existing rows by their original IDs
     const existingRowsMap = new Map();
     rows.forEach((r) => {
       if (r.__originalIndex !== undefined) {
         existingRowsMap.set(r.__originalIndex, r);
       }
-      // Also track by actual ID if available
       if (r.id && !r.id.startsWith("new_")) {
         existingRowsMap.set(`id_${r.id}`, r);
       }
     });
 
-    // Track which rows are currently selected
     const currentlySelectedIds = Object.keys(selected).filter(
       (id) => selected[id],
     );
 
     const mergedRows = TableArray.map((row, index) => {
       const originalRowId = row.id || `row_${index}_${Date.now()}`;
-
-      // Try to find existing row by originalIndex or ID
       let existingRow = existingRowsMap.get(index);
       if (!existingRow && row.id) {
         existingRow = existingRowsMap.get(`id_${row.id}`);
       }
 
       if (existingRow) {
-        // Check if this row was selected
         const wasSelected = selected[existingRow.id];
-
-        // Create new row object preserving selection and edits
         const newRow = {
           ...existingRow,
-          // Update with any new data from TableArray (preserve user edits)
           ...Object.fromEntries(
             Object.keys(row)
               .filter(
@@ -813,7 +933,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           ),
         };
 
-        // If this row was selected, update the selected state
         if (wasSelected) {
           console.log(
             `Row ${existingRow.id} was selected, preserving selection`,
@@ -822,7 +941,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
         return newRow;
       } else {
-        // Create new row from TableArray
         return {
           ...row,
           id: originalRowId,
@@ -832,7 +950,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     });
 
-    // Add any new rows that aren't in TableArray (user-added rows)
     const newRowsNotInTableArray = rows.filter(
       (r) =>
         !r.__isFromTableArray &&
@@ -842,21 +959,18 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     const allRows = [...mergedRows, ...newRowsNotInTableArray];
 
-    // IMPORTANT: Preserve selection state when updating rows
     const newSelected: Record<string, boolean> = { ...selected };
     const newSelectedRows: any[] = [];
 
-    // Rebuild selectedRows array based on current selection state and merged rows
     allRows.forEach((row) => {
       if (newSelected[row.id]) {
         newSelectedRows.push(row);
       }
     });
-    // Only update if there's an actual difference
+
     if (JSON.stringify(allRows) !== JSON.stringify(rows)) {
       setRows(allRows);
 
-      // Update selectedRows if needed (but keep selection state intact)
       if (JSON.stringify(newSelectedRows) !== JSON.stringify(selectedRows)) {
         setSelectedRows(newSelectedRows);
         if (onSelectionChanged) {
@@ -864,7 +978,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // Make sure selection state is still saved to localStorage
       try {
         localStorage.setItem(
           `${tableInstanceKey}_selection`,
@@ -876,22 +989,19 @@ const NewTablePage: React.FC<NewTableProps> = ({
       } catch (error) {
         console.error("Error saving selection after TableArray sync:", error);
       }
-    } else {
-      console.log("No changes in rows, skipping update");
     }
-  }, [TableArray]); // Only depend on TableArray prop
+  }, [TableArray]);
+
   const generateStableRowId = useCallback(() => {
     const timestamp = Date.now();
     const random = Math.random().toString(36).substr(2, 9);
     return `new_${timestamp}_${random}_${moduleID}_${fieldID}`;
   }, [moduleID, fieldID]);
 
-  // Calculate the number of edited rows
   const editedRowsCount = useMemo(() => {
     return Object.keys(editedValues).length;
   }, [editedValues]);
 
-  // Or if you need to count individual cell edits across all rows:
   const totalEditsCount = useMemo(() => {
     let count = 0;
     Object.values(editedValues).forEach((rowEdits) => {
@@ -900,7 +1010,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     return count;
   }, [editedValues]);
 
-  // Update buttonHandlers - remove Save and Replace from here since they'll be handled by the new logic
   const buttonHandlers: Record<string, (button: any, row?: any) => void> = {
     Export: () => setExportOpen(!exportOpen),
     "Add Row": () => handleAddNewRow(),
@@ -915,12 +1024,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
       });
     },
     "Cancel Edit": () => handleCancelEdit(),
-    // Remove Save and Replace from here - they'll be handled by backend buttons logic
     Undo: () => handleUndo(),
     Redo: () => handleRedo(),
   };
 
-  // Update buttonConditions - remove Save and Replace
   const buttonConditions: Record<string, (state: any) => boolean> = {
     Edit: () => !localEditMode && !isLoading,
     "Cancel Edit": () => localEditMode,
@@ -928,7 +1035,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     Redo: () => future.length > 0,
   };
 
-  // Update buttonTooltips - remove Save
   const buttonTooltips: Record<string, string> = {
     "Add Row":
       selectedRows.length > 0
@@ -941,12 +1047,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     Redo: "Redo last undone action (Ctrl+Y)",
   };
 
-  // In NewTablePage.tsx - Add these functions before the return statement
-
-  // Function to handle UpdateDynamicFieldsValuesNew API
   const handleSubmitAPI = async (button: any) => {
     try {
-      // Get the field data from saveData
       const fieldData: any[] = [];
       const fieldDataFromState = updatedPersonalDetails || [];
 
@@ -974,7 +1076,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           });
         });
       } else {
-        // If no buttonFields, collect all fields from current tab
         const currentTab = fieldDataFromState[0];
         if (currentTab?.Values) {
           currentTab.Values.forEach((res: any) => {
@@ -993,7 +1094,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // Collect selected table data if any
       const selectedTableData = collectSelectedTableData();
 
       const payload = {
@@ -1003,7 +1103,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         fieldsDatanew: fieldData,
       };
 
-      // Add table data if exists
       if (selectedTableData && selectedTableData.length > 0) {
         payload.tabledata = selectedTableData;
       }
@@ -1025,7 +1124,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           style: { top: "50px" },
         });
 
-        // Clear edited values after successful save
         setEditedValues({});
         setModifiedRows({});
 
@@ -1049,28 +1147,23 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Function to handle AutoCall API
   const handleAutoCallAPI = async (button: any) => {
     try {
-      // Get the PostedJson data from saveData using the field IDs
       const postedJson: any[] = [];
       const fieldData = information?.Data || [];
 
-      // Collect data from all fields
       if (fieldData && fieldData.length > 0) {
         fieldData.forEach((dataObj: any) => {
           if (dataObj?.Fields && dataObj.Fields.length > 0) {
             dataObj.Fields.forEach((fieldGroup: any) => {
               if (fieldGroup?.Values && fieldGroup.Values.length > 0) {
                 fieldGroup.Values.forEach((field: any) => {
-                  // Check if this field ID is in the button's buttonFields array
                   const isInButtonFields = button.buttonFields?.some(
                     (btnField: any) =>
                       Number(btnField.FieldID) === Number(field.FieldID),
                   );
 
                   if (isInButtonFields) {
-                    // Try to get the field value from multiple sources
                     const fieldValue =
                       saveData[field.FieldName] ||
                       field.FieldValue ||
@@ -1089,16 +1182,15 @@ const NewTablePage: React.FC<NewTableProps> = ({
           }
         });
       }
-      // Store the data for the drawer
+
       setReplaceButtonData({
         buttonId: button.ButtonID,
         moduleID: menuID || moduleID,
-        recordID: button.ButtonID.toString(), // Use ButtonID as recordID
+        recordID: button.ButtonID.toString(),
         postedJson: postedJson,
         apiUrl: button.ButtonURL,
       });
 
-      // Open the drawer
       setReplaceDrawerOpen(true);
 
       toast.success("Opening form...", {
@@ -1116,13 +1208,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Function to handle PostDynamic API
   const handlePostDynamicAPI = async (button: any) => {
     try {
-      // Build payload similar to buttonField component
       const newArray: any = [];
 
-      // Get field data from updatedPersonalDetails
       updatedPersonalDetails?.forEach((resData: any) => {
         resData?.Values?.forEach((res: any) => {
           button.buttonFields?.forEach((response: any) => {
@@ -1147,7 +1236,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         return;
       }
 
-      // Validate mandatory fields if needed
       if (button.IsConfirmCheck) {
         const { confirmed } = await confirm({
           title: "Are you sure?",
@@ -1169,9 +1257,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
         },
       });
 
-      // Handle response
       if (result.data) {
-        // Update table metadata if needed
         if (result.data.FieldID || result.data.Table || result.data.ChartData) {
           setTableMetadata({
             isDetailPopupOpen: result.data.IsDetailPopupOpen || false,
@@ -1199,10 +1285,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
             chartIds: result.data.Chartids || null,
             isFreezeHeader: result.data.IsFreezeHeader || null,
             popupdrawersettings: result.data.Popupdrawersettings || null,
+            isOpenonTables: result.data.IsOpenonTables || false,
+            isOpenwithTabs: result.data.IsOpenwithTabs || false,
           });
         }
 
-        // Update table data if present
         if (result.data.Table && result.data.FieldID) {
           const newUpdatedDetails = updatedPersonalDetails
             ? [...updatedPersonalDetails]
@@ -1220,16 +1307,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
             }
           });
 
-          // Update parent if onTableDataUpdate is available
           if (onTableDataUpdate) {
             onTableDataUpdate(result.data.Table, fieldID);
           }
         }
 
-        // Update fields if present
         if (result.data.fields) {
           result.data.fields.forEach((field: any) => {
-            // Update saveData if we have it
             if (setSaveData) {
               setSaveData((prev: any) => ({
                 ...prev,
@@ -1252,14 +1336,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Update the renderDynamicButton function to handle the new API calls
   const renderDynamicButton = (button: any) => {
     const buttonName = button.Buttonname;
     const handler = buttonHandlers[buttonName];
     const condition = buttonConditions[buttonName];
     const tooltip = buttonTooltips[buttonName] || button.Buttonname;
 
-    // Check if this is a special system button that should use existing handlers
     const isSystemButton = [
       "Export",
       "Add Row",
@@ -1270,7 +1352,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       "Redo",
     ].includes(buttonName);
 
-    // Skip if it's a system button with existing handler
     if (isSystemButton) {
       const isDisabled = condition
         ? !condition({
@@ -1283,7 +1364,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           })
         : false;
 
-      // Special handling for Export button
       if (buttonName === "Export") {
         return (
           <ButtonDropdown
@@ -1326,7 +1406,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
       }
 
-      // Special handling for Add Row button
       if (buttonName === "Add Row") {
         return (
           <div className="flex gap-2">
@@ -1362,7 +1441,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
       }
 
-      // Special handling for Save button - but only if it's the system Save, not API Save
       if (buttonName === "Save" && !button.ButtonURL) {
         return (
           <Button
@@ -1390,7 +1468,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
       }
 
-      // Default system button rendering
       return (
         <Button
           key={button.ButtonID}
@@ -1414,14 +1491,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // For backend buttons with API URLs
     const handleBackendButtonClick = async () => {
       if (buttonLoading) return;
 
       setButtonLoading(true);
 
       try {
-        // Check if ButtonURL is provided
         if (!button.ButtonURL) {
           toast.error("No API URL configured for this button", {
             style: { top: 80 },
@@ -1429,7 +1504,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           return;
         }
 
-        // Check for confirmation if needed
         if (button.IsConfirmCheck) {
           const { confirmed } = await confirm({
             title: "Are you sure?",
@@ -1440,7 +1514,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           }
         }
 
-        // Determine which API to call based on flags
         if (button.IsAutocall) {
           await handleAutoCallAPI(button);
         } else if (button.IsSubmitAPI) {
@@ -1448,7 +1521,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         } else if (button.IsPostDynamic) {
           await handlePostDynamicAPI(button);
         } else {
-          // Default: treat as PostDynamic if URL is provided but no specific flag
           await handlePostDynamicAPI(button);
         }
       } catch (error) {
@@ -1489,17 +1561,16 @@ const NewTablePage: React.FC<NewTableProps> = ({
       </Button>
     );
   };
+
   const handleCancelEdit = () => {
     if (!localEditMode) {
       toast.info("Table is not in edit mode", { style: { marginTop: 20 } });
       return;
     }
 
-    // Check if there are unsaved changes
     const hasUnsavedChanges = editedRowsCount > 0;
 
     if (hasUnsavedChanges) {
-      // Show confirmation for unsaved changes
       if (
         window.confirm(
           "You have unsaved changes. Are you sure you want to cancel?",
@@ -1513,10 +1584,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
   };
 
   const performCancelEdit = () => {
-    // Clear all edited values
     setEditedValues({});
 
-    // Reset to original data
     if (TableArray && TableArray.length > 0) {
       setRows(
         TableArray.map((row, index) => ({
@@ -1527,13 +1596,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // Exit edit mode
     setLocalEditMode(false);
     if (setEditBtn) {
       setEditBtn(false);
     }
 
-    // Clear selections
     setSelectedRows([]);
     setSelected({});
 
@@ -1542,12 +1609,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
     });
   };
 
-  // In NewTablePage - Fix the table type detection
   const isUploadedFilesTable = useMemo(() => {
     if (!uploadedFiles || uploadedFiles.length === 0) return false;
-
     const firstRow = uploadedFiles[0];
-    // More specific check for uploaded files table
     return (
       firstRow &&
       ((firstRow.FileLink !== undefined && firstRow.Filename !== undefined) ||
@@ -1555,11 +1619,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
     );
   }, [uploadedFiles]);
 
-  // Add this to properly detect if it's a regular data table
   const isRegularDataTable = useMemo(() => {
     return tablebuttons && tablebuttons.length > 0 && !isUploadedFilesTable;
   }, [tablebuttons, isUploadedFilesTable]);
-  // In NewTablePage component - fix the selection logic
+
   const handleRowSelection = (rowId: string, isSelected: boolean) => {
     const row = rows.find((r) => r.id === rowId);
     if (!row) return;
@@ -1567,17 +1630,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
     let newSelectedRows: any[];
 
     if (isSelected) {
-      // Add row to selection
       newSelectedRows = [...selectedRows, row];
     } else {
-      // Remove row from selection
       newSelectedRows = selectedRows.filter((r) => r.id !== rowId);
     }
 
     setSelectedRows(newSelectedRows);
     setSelected((prev) => ({ ...prev, [rowId]: isSelected }));
 
-    // Notify parent component about selection changes
     if (onSelectionChanged) {
       onSelectionChanged(newSelectedRows);
     }
@@ -1587,13 +1647,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
     let newSelectedRows: any[];
 
     if (isSelected) {
-      // Add all visible rows to selection
       const newRows = renderRows.filter(
         (r) => !selectedRows.some((sr) => sr.id === r.id),
       );
       newSelectedRows = [...selectedRows, ...newRows];
     } else {
-      // Remove all visible rows from selection
       newSelectedRows = selectedRows.filter(
         (sr) => !renderRows.some((r) => r.id === sr.id),
       );
@@ -1601,20 +1659,17 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     setSelectedRows(newSelectedRows);
 
-    // Update individual selection state
     const newSelection: Record<string, boolean> = { ...selected };
     renderRows.forEach((r) => {
       newSelection[r.id] = isSelected;
     });
     setSelected(newSelection);
 
-    // Notify parent
     if (onSelectionChanged) {
       onSelectionChanged(newSelectedRows);
     }
   };
 
-  // Add useEffect to sync with external selectedRows prop
   useEffect(() => {
     if (selectedRows && selectedRows !== selectedRows) {
       const newSelection: Record<string, boolean> = {};
@@ -1628,7 +1683,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   }, [selectedRows]);
 
-  // Initialize selected options based on tableFooter IsDisplay property
   const [selectedOptions, setSelectedOptions] = useState<string[]>(() => {
     if (tableFooter && tableFooter.length > 0) {
       return tableFooter
@@ -1647,26 +1701,17 @@ const NewTablePage: React.FC<NewTableProps> = ({
   }, [selectedOptions]);
 
   const getColumnConfig = (columnName: string) => {
-    // Try to find the config in reportData.columnsArray first
-    // const fromReport = reportData?.columnsArray?.find(
-    //   (data: any) => data?.columnName === columnName || data?.Fieldname === columnName
-    // );
-    // if (fromReport) return fromReport;
-
-    // Fallback: some configs may come from tableFooter (Fieldname)
     if (Array.isArray(tableFooter)) {
       const fromFooter = tableFooter.find(
         (f: any) => f?.Fieldname === columnName || f?.columnName === columnName,
       );
       if (fromFooter) return fromFooter;
     }
-
     return undefined;
   };
 
   const handleColumnFilterChange = (colId: string, value: any) => {
     setColumnFilters((prev) => ({ ...prev, [colId]: value }));
-    // reset to first page when filters change
     setPage(1);
   };
 
@@ -1726,11 +1771,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
     return tablebuttons && tablebuttons.length > 0 && !isUploadedFilesTable;
   }, [tablebuttons, isUploadedFilesTable]);
 
-  // In NewTablePage component - Update the useEffect that initializes columns
-
-  // Replace the useEffect that initializes columns with this:
   useEffect(() => {
-    // Determine the source of column definitions
     const sourceCols =
       columns && columns.length > 0
         ? columns
@@ -1741,47 +1782,26 @@ const NewTablePage: React.FC<NewTableProps> = ({
     if (sourceCols && sourceCols.length > 0) {
       let newCols: any[] = [];
 
-      // Handle special case: when TableArray has data, use its keys in the order they appear
       if (TableArray && TableArray.length > 0) {
         const firstRow = TableArray[0];
 
-        // Create a function to preserve the order of keys as they appear in the JSON
         const getKeysInOriginalOrder = (obj: any): string[] => {
           const keys: string[] = [];
-
-          // Use Object.getOwnPropertyNames to get all enumerable and non-enumerable properties
           const allKeys = Object.getOwnPropertyNames(obj);
-
-          // Sort keys to handle mixed numeric/string keys properly
-          // But we need to preserve the order they were sent
-          // We'll check if keys look like they should be in a specific order
           const hasNumericKeys = allKeys.some((key) => /^\d{4}$/.test(key));
 
           if (hasNumericKeys) {
-            // Separate numeric and non-numeric keys
             const numericKeys = allKeys.filter((key) => /^\d{4}$/.test(key));
             const stringKeys = allKeys.filter((key) => !/^\d{4}$/.test(key));
-
-            // Sort numeric keys in descending order (if they're years)
             numericKeys.sort((a, b) => parseInt(b) - parseInt(a));
-
-            // Combine: string keys first, then sorted numeric keys
-            // But for your case, you want numeric keys in original order
-            // Let's check the first row to determine order
             const originalOrder = Object.keys(firstRow);
-
-            // Use the order from the first row if it looks sensible
             if (originalOrder.length > 0) {
-              // Check if first key is "Code"
               if (originalOrder[0] === "Code") {
                 return originalOrder;
               }
-              // Otherwise use a more predictable order
               return [...stringKeys, ...numericKeys.sort()];
             }
           }
-
-          // Default: return keys in the order they were received
           return Object.keys(obj);
         };
 
@@ -1796,7 +1816,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               key !== "actions",
           )
           .map((key, index) => {
-            // Find matching column configuration
             const colConfig = sourceCols.find(
               (col: any) =>
                 col.name === key ||
@@ -1804,7 +1823,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
                 col.Fieldname === key ||
                 col.ColumnName === key,
             );
-
             return {
               id: key,
               label:
@@ -1814,12 +1832,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
                 key,
               width: 150,
               pin: index === 0 ? "left" : undefined,
-              // Preserve original column config
               ...colConfig,
             };
           });
       } else {
-        // Fallback to original logic when no TableArray data
         newCols = sourceCols.map((col: any, index: number) => ({
           id: col.name || col.field || col.Fieldname || `col_${index}`,
           label: col.name || col.Fieldname || "Unnamed",
@@ -1829,7 +1845,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }));
       }
 
-      // ALWAYS add selection column if ischeckBoxReq is true
       if (ischeckBoxReq === true) {
         const hasSelectCol = newCols.some((col: any) => col.id === "select");
         if (!hasSelectCol) {
@@ -1842,12 +1857,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // Check if Actions column already exists
       const hasExistingActionsColumn = newCols.some(
         (col: any) => col.id === "actions" || col.label === "Actions",
       );
 
-      // Add Actions column ONLY for regular tables with buttons
       if (shouldShowActionsColumn && !hasExistingActionsColumn) {
         newCols.push({
           id: "actions",
@@ -1859,7 +1872,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       setCols(newCols);
 
-      // Prefetch dropdown data for DROPDOWN columns
       newCols.forEach((c: any) => {
         const inputType = c.Inputtype || c.inputType || c.InputType || c.type;
         if (inputType === "DROPDOWN") {
@@ -1867,7 +1879,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       });
 
-      // Initialize visibility
       const initialVisible: Record<string, boolean> = {};
       newCols.forEach((col: any) => {
         if (col.id === "select" || col.id === "actions") {
@@ -1892,10 +1903,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     TableArray,
   ]);
 
-  // Initialize rows from TableArray
   useEffect(() => {
     if (TableArray && TableArray.length > 0) {
-      // Merge incoming TableArray with any pending editedValues so edits aren't lost
       const mapped = TableArray.map((row, index) => {
         const id = row.id || `row_${index}`;
         const base = { ...row, id, __originalIndex: index };
@@ -1912,14 +1921,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
       setRows(mapped);
     }
   }, [TableArray]);
-  // In NewTablePage.tsx - add this useEffect
+
   useEffect(() => {
     if (TableArray && TableArray.length === 0) {
       setRows([]);
       setCols([]);
     }
   }, [TableArray]);
-  // Update selected options when columns change
+
   useEffect(() => {
     const visibleCols = cols
       .filter((col) => col.id !== "select" && visible[col.id] !== false)
@@ -1927,12 +1936,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
     setSelectedOptions(visibleCols);
   }, [cols, visible]);
 
-  // Filter visible columns
   const visibleCols = useMemo(() => {
     return cols.filter((col) => visible[col.id] !== false);
   }, [cols, visible]);
 
-  // Handle search with debounce
   useEffect(() => {
     const t = setTimeout(() => {
       setFilters((f: any) => ({ ...f, q: qLive }));
@@ -1940,11 +1947,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     return () => clearTimeout(t);
   }, [qLive]);
 
-  // Filter rows based on filters
   const filteredRows = useMemo(() => {
     const q = (filters.q || "").trim().toLowerCase();
-
-    // Combine existing rows and new rows
     const allRows = [...rows];
 
     return allRows.filter((r) => {
@@ -1953,20 +1957,16 @@ const NewTablePage: React.FC<NewTableProps> = ({
         if (!searchableText.includes(q)) return false;
       }
 
-      // Add additional filter logic here based on your needs
       if (filters.role && r.role !== filters.role) return false;
       if (filters.status && r.status !== filters.role) return false;
 
-      // Apply per-column filters
       for (const [colId, fVal] of Object.entries(columnFilters)) {
         if (fVal === undefined || fVal === null) continue;
-        // treat empty strings as no-filter
         if (typeof fVal === "string" && fVal.trim() === "") continue;
 
         const cellRaw = r[colId] ?? "";
         const cell = String(cellRaw).toLowerCase();
 
-        // Date range filter format 'YYYY-MM-DD|YYYY-MM-DD'
         if (typeof fVal === "string" && fVal.includes("|")) {
           const [start, end] = fVal.split("|").map((s) => s.trim());
           if (start && end) {
@@ -1987,14 +1987,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
           }
         }
 
-        // Dropdown may provide object { value, label }
         if (typeof fVal === "object") {
           const fv = (fVal.value ?? fVal.label ?? "").toString().toLowerCase();
           if (fv && !cell.includes(fv)) return false;
           continue;
         }
 
-        // Default substring match for textbox/box
         if (typeof fVal === "string") {
           if (!cell.includes(fVal.toLowerCase())) return false;
         }
@@ -2003,7 +2001,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       return true;
     });
   }, [rows, filters, newRows, columnFilters]);
-  // Sort rows
+
   const sortedRows = useMemo(() => {
     if (!sortState.length) return filteredRows;
     const order = [...sortState];
@@ -2020,7 +2018,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     });
   }, [filteredRows, sortState]);
 
-  // Pagination
   const totalPages = Math.max(
     1,
     Math.ceil((sortedRows?.length || 0) / pageSize),
@@ -2033,11 +2030,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     );
   }, [sortedRows, pageSafe, pageSize]);
 
-  // Virtualization
   const rowH = 40;
 
-  // Always call this hook to respect React hooks rules. It accepts an `enabled`
-  // flag so callers can decide whether to actually perform virtualization logic.
   function useSimpleVirtual(
     enabled: boolean,
     count: number,
@@ -2095,37 +2089,31 @@ const NewTablePage: React.FC<NewTableProps> = ({
     virtualize,
     sortedRows.length,
     rowH,
-    tableWrapRef, // <-- was containerRef
+    tableWrapRef,
   );
-  // When virtualize is enabled via the toggle, this displays all the rows
+
   const renderRows = virtualize
     ? sortedRows.slice(virt.start, virt.end)
     : pageRows;
 
-  // switch to the first page and expand pageSize so all rows are visible if needed.
   const handleVirtualizeToggle = () => {
     setVirtualize((prev) => {
       const next = !prev;
       if (!next) {
-        // Restore a sensible page size when turning off
         setPageSize(pageitemscnt || 10);
         setPage(1);
       }
-      // Do NOT change pageSize when turning ON — keep whatever the user selected
       return next;
     });
   };
 
-  // Selection helpers
   const allPageSelected = useMemo(() => {
     return (
       sortedRows.length > 0 && sortedRows.every((r: any) => selected[r.id])
     );
   }, [sortedRows, selected]);
 
-  // Update the handleTableButtonClick function:
   const handleTableButtonClick = async (button: any, row: any) => {
-    // Check if row is selected
     const isRowSelected = selectedRows.some(
       (selectedRow) => selectedRow.id === row.id,
     );
@@ -2138,21 +2126,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
 
     try {
-      // Prepare the data for the API call - handle column name mapping
       const buttonFieldsData = button.columnnames.map((col: any) => {
-        // Try different possible column name formats
         let value = "";
 
-        // Try exact match first
         if (row[col.Colname] !== undefined) {
           value = row[col.Colname];
-        }
-        // Try with VC_ prefix
-        else if (row[`VC_${col.Colname}`] !== undefined) {
+        } else if (row[`VC_${col.Colname}`] !== undefined) {
           value = row[`VC_${col.Colname}`];
-        }
-        // Try case-insensitive match
-        else {
+        } else {
           const matchingKey = Object.keys(row).find(
             (key) => key.toLowerCase() === col.Colname.toLowerCase(),
           );
@@ -2168,8 +2149,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       });
 
       const payload = [...buttonFieldsData];
-
-      // Get buttonID from multiple possible sources
       const effectiveButtonID = fieldID || button.ButtonID || 0;
 
       const data = {
@@ -2178,7 +2157,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
         PostedJson: payload,
         ButtonID: effectiveButtonID,
       };
-      // Make the API call
+
       const result = await axios.post(button.APIURL, data, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -2194,14 +2173,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
           },
         );
 
-        // Refresh the table data if needed
         if (setUploadedFiles && isUploadedFilesTable) {
           setUploadedFiles(result.data.files || uploadedFiles);
         }
       }
     } catch (error: any) {
       console.error("API Error:", error);
-      console.error("Error details:", error.response?.data);
       toast.error(
         error?.response?.data?.Message || error?.message || "An error occurred",
         {
@@ -2244,10 +2221,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
   };
 
   useEffect(() => {
-    // Clean up selected rows that no longer exist in the current data
     const validSelectedRows = selectedRows.filter((selectedRow) =>
       rows.some((row) => {
-        // Use a more reliable ID matching
         const rowId = row.id || row.app_id || row.__originalIndex;
         const selectedId =
           selectedRow.id || selectedRow.app_id || selectedRow.__originalIndex;
@@ -2263,7 +2238,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   }, [rows]);
 
-  // In NewTablePage.tsx - Update toggleRow function
   const toggleRow = (rowId: string) => {
     const row = rows.find((r) => r.id === rowId);
     if (!row) return;
@@ -2271,31 +2245,25 @@ const NewTablePage: React.FC<NewTableProps> = ({
     const isCurrentlySelected = selected[rowId];
     let newSelectedRows: any[];
 
-    // Check if this row has edits
     const rowEdits = editedValues[rowId];
     const rowWithEdits = rowEdits ? { ...row, ...rowEdits } : row;
 
     if (isCurrentlySelected) {
-      // Remove row from selection
       newSelectedRows = selectedRows.filter((r) => r.id !== rowId);
     } else {
-      // Add row WITH EDITS to selection
       newSelectedRows = [...selectedRows, rowWithEdits];
     }
 
-    // Save to history BEFORE making changes
     saveToHistory({
       rows: rows,
       selected: { ...selected },
       selectedRows: [...selectedRows],
     });
 
-    // Update both states
     setSelectedRows(newSelectedRows);
     const newSelected = { ...selected, [rowId]: !isCurrentlySelected };
     setSelected(newSelected);
 
-    // Save to localStorage
     try {
       localStorage.setItem(
         `${tableInstanceKey}_selection`,
@@ -2316,16 +2284,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
       console.error("Error saving selection:", error);
     }
 
-    // Notify parent
     if (onSelectionChanged) {
       onSelectionChanged(newSelectedRows);
     }
   };
-  // Update toggleAllPage function
+
   const toggleAllPage = () => {
     const on = !allPageSelected;
 
-    // Save current state to history BEFORE making changes
     saveToHistory({
       rows: rows,
       selected: { ...selected },
@@ -2333,12 +2299,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
     });
 
     if (on) {
-      // Select ALL sorted rows (not just page rows)
       const allRowsSelection: Record<string, boolean> = {};
       const allSelectedRows: any[] = [];
 
       sortedRows.forEach((row: any) => {
-        // Check if this row has edits
         const rowEdits = editedValues[row.id];
         const rowWithEdits = rowEdits ? { ...row, ...rowEdits } : row;
 
@@ -2346,11 +2310,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
         allSelectedRows.push(rowWithEdits);
       });
 
-      // Update both states
       setSelected(allRowsSelection);
       setSelectedRows(allSelectedRows);
 
-      // Save to localStorage
       try {
         localStorage.setItem(
           `${tableInstanceKey}_selection`,
@@ -2371,17 +2333,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
         console.error("Error saving selection:", error);
       }
 
-      // Notify parent with ALL selected rows
       if (onSelectionChanged) {
         onSelectionChanged(allSelectedRows);
       }
     } else {
-      // Deselect all rows
       const emptySelection = {};
       setSelected(emptySelection);
       setSelectedRows([]);
 
-      // Save to localStorage
       try {
         localStorage.setItem(
           `${tableInstanceKey}_selection`,
@@ -2402,14 +2361,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
         console.error("Error saving selection:", error);
       }
 
-      // Notify parent with empty array
       if (onSelectionChanged) {
         onSelectionChanged([]);
       }
     }
   };
 
-  // Add this useEffect to auto-save when selection changes
   useEffect(() => {
     const saveSelection = () => {
       try {
@@ -2428,12 +2385,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     };
 
-    // Debounce the save to prevent too many writes
     const timer = setTimeout(saveSelection, 500);
     return () => clearTimeout(timer);
   }, [selected, tableInstanceKey]);
 
-  // Add this useEffect for selectedRows
   useEffect(() => {
     const saveSelectedRows = () => {
       try {
@@ -2452,11 +2407,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     };
 
-    // Debounce the save
     const timer = setTimeout(saveSelectedRows, 500);
     return () => clearTimeout(timer);
   }, [selectedRows, tableInstanceKey]);
-  // Sorting
+
   function toggleSort(id: string, additive: boolean) {
     setSortState((s) => {
       const i = s.findIndex((x) => x.id === id);
@@ -2468,7 +2422,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       return additive ? next : [next[i]];
     });
   }
-  // Editing
+
   function startEdit(id: string, field: string, value: any) {
     setEditing({ id, field, value });
   }
@@ -2481,7 +2435,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     if (!editing) return;
     const { id, field, value } = editing;
 
-    // Call the parent's onChangeInput if provided
     if (onChangeInput) {
       const row = rows.find((r) => r.id === id);
       if (row) {
@@ -2492,7 +2445,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     }
 
-    // Update local state
     setRows((rs) =>
       rs.map((r) => (r.id === id ? { ...r, [field]: value } : r)),
     );
@@ -2500,7 +2452,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
   }
 
   useEffect(() => {
-    // When rows change, update selectedRows to remove any rows that no longer exist
     const validSelectedRows = selectedRows.filter((sr) =>
       rows.some((r) => r.id === sr.id),
     );
@@ -2513,25 +2464,21 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   }, [rows]);
 
-  // In NewTablePage component, add a useEffect to auto-save when in edit mode
   useEffect(() => {
     if (localEditMode && editedRowsCount > 0) {
-      // Debounce auto-save to prevent too many API calls
       const autoSaveTimer = setTimeout(() => {
         if (handleSaveData) {
           const modifiedData = getModifiedDataForSave();
           if (modifiedData.length > 0) {
             handleSaveData(modifiedData);
-            // Don't clear editedValues here - let user see what was saved
           }
         }
-      }, 2000); // Auto-save after 2 seconds of inactivity
+      }, 2000);
 
       return () => clearTimeout(autoSaveTimer);
     }
   }, [editedValues, localEditMode, handleSaveData]);
 
-  // In NewTablePage.tsx - Update the updateParentTableData function
   const updateParentTableData = useCallback(
     (data: any[], fieldID?: string) => {
       if (!onTableDataUpdate) return;
@@ -2539,10 +2486,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
       const now = Date.now();
       const timeSinceLastUpdate = now - lastUpdateTimeRef.current;
 
-      // Prevent rapid updates but allow important ones
       if (isUpdatingRef.current && timeSinceLastUpdate < 300) return;
 
-      // Check if data actually changed
       const previousData = rowsForExport();
       if (JSON.stringify(previousData) === JSON.stringify(data)) {
         return;
@@ -2551,11 +2496,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
       isUpdatingRef.current = true;
       lastUpdateTimeRef.current = now;
 
-      // Sanitize data
       const sanitizedData = data.map((row) => {
         const sanitized: any = {};
         Object.keys(row).forEach((key) => {
-          // Preserve important flags but clean up temporary ones
           if (key === "__isNew" || key === "__modified") {
             sanitized[key] = row[key];
           } else if (
@@ -2569,10 +2512,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
         });
         return sanitized;
       });
-      // Call parent update
+
       onTableDataUpdate(sanitizedData, fieldID);
 
-      // Reset updating flag
       setTimeout(() => {
         isUpdatingRef.current = false;
       }, 100);
@@ -2587,11 +2529,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
         e.stopPropagation();
       }
 
-      // Check if any rows are selected
       if (selectedRows.length > 0) {
-        // DUPLICATE SELECTED ROWS at the top
-
-        // Save to history
         saveToHistory({
           rows: rows,
           selected: { ...selected },
@@ -2599,40 +2537,23 @@ const NewTablePage: React.FC<NewTableProps> = ({
           editedValues: { ...editedValues },
         });
 
-        // Create duplicates of selected rows
         const newDuplicatedRows = selectedRows.map((row) => {
-          // Create a deep copy of the row
           const duplicatedRow = JSON.parse(JSON.stringify(row));
-
-          // Generate a new unique ID
           duplicatedRow.id = `dup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-          // Mark as new and duplicated
           duplicatedRow.__isNew = true;
           duplicatedRow.__isDuplicated = true;
           duplicatedRow.__originalRowId = row.id;
           duplicatedRow.__addedTimestamp = Date.now();
           duplicatedRow.__persistent = true;
-
-          // Remove selection-related properties
           delete duplicatedRow.__selected;
           delete duplicatedRow.__modified;
-
           return duplicatedRow;
         });
 
-        // Add duplicates at the TOP of the rows array
         const updatedRows = [...newDuplicatedRows, ...rows];
-
-        // Update state
         setRows(updatedRows);
         setNewRows((prev) => [...newDuplicatedRows, ...prev]);
 
-        // Clear selection after duplication (optional)
-        // setSelected({});
-        // setSelectedRows([]);
-
-        // Update parent after a short delay
         setTimeout(() => {
           updateParentTableData(updatedRows, fieldID);
         }, 100);
@@ -2646,9 +2567,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           },
         );
       } else {
-        // ADD BLANK ROW at the top
-
-        // Get column definitions
         let baseCols = [];
         if (cols && cols.length > 0) {
           baseCols = cols;
@@ -2665,14 +2583,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
           __persistent: true,
         };
 
-        // Initialize columns
         baseCols.forEach((col: any) => {
           const colId = col.id || col.name || col.Fieldname;
           if (!colId || colId === "select" || colId === "actions") return;
           newRow[colId] = "";
         });
 
-        // Save to history
         saveToHistory({
           rows: rows,
           selected: { ...selected },
@@ -2680,12 +2596,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
           editedValues: { ...editedValues },
         });
 
-        // Add new row at the TOP of the rows array
         const updatedRows = [newRow, ...rows];
         setRows(updatedRows);
         setNewRows((prev) => [newRow, ...prev]);
 
-        // Update parent after a short delay
         setTimeout(() => {
           updateParentTableData(updatedRows, fieldID);
         }, 100);
@@ -2709,7 +2623,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       updateParentTableData,
     ],
   );
-  // In NewTablePage.tsx - Add this function
+
   const syncEditsWithSelection = useCallback(() => {
     if (selectedRows.length === 0 || Object.keys(editedValues).length === 0) {
       return;
@@ -2718,24 +2632,21 @@ const NewTablePage: React.FC<NewTableProps> = ({
     const updatedSelectedRows = selectedRows.map((row) => {
       const rowEdits = editedValues[row.id];
       if (rowEdits) {
-        // Apply edits to selected row
         const updatedRow = { ...row };
         Object.keys(rowEdits).forEach((key) => {
           if (key !== "__originalData") {
             updatedRow[key] = rowEdits[key];
           }
         });
-        updatedRow.__modified = true; // Mark as modified
+        updatedRow.__modified = true;
         return updatedRow;
       }
       return row;
     });
 
-    // Only update if there are changes
     if (JSON.stringify(selectedRows) !== JSON.stringify(updatedSelectedRows)) {
       setSelectedRows(updatedSelectedRows);
 
-      // Save to localStorage
       try {
         const tableKey = `table_${menuID}_${fieldID}`;
         const storageKey = `${tableKey}_selectedRows`;
@@ -2750,14 +2661,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
         console.error("Error saving synced selection:", error);
       }
 
-      // Notify parent about the updated selection
       if (onSelectionChanged) {
         onSelectionChanged(updatedSelectedRows);
       }
     }
   }, [selectedRows, editedValues, menuID, fieldID, onSelectionChanged]);
 
-  // Call this function whenever editedValues changes
   useEffect(() => {
     const timer = setTimeout(() => {
       syncEditsWithSelection();
@@ -2768,7 +2677,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
   const applyFirstCellToAll = useCallback(
     (columnId: string, value: any, excludeRowId: string) => {
-      // Check if there are active filters
       const hasActiveFilters = Object.values(columnFilters).some(
         (filterValue) =>
           filterValue !== null &&
@@ -2776,13 +2684,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
           filterValue !== "",
       );
 
-      // If no active filters, don't apply to all rows
       if (!hasActiveFilters) {
         console.log("No active filters - not applying to all rows");
         return;
       }
 
-      // Get FILTERED rows (from sortedRows, not all rows)
       const filteredRowIds = sortedRows.map((row) => row.id);
 
       if (filteredRowIds.length === 0) {
@@ -2793,7 +2699,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         return;
       }
 
-      // Save to history BEFORE making changes
       saveToHistory({
         rows: rows,
         selected: { ...selected },
@@ -2801,7 +2706,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         editedValues: { ...editedValues },
       });
 
-      // Update ONLY filtered rows except the first one
       const updatedRows = rows.map((row) => {
         if (filteredRowIds.includes(row.id) && row.id !== excludeRowId) {
           return {
@@ -2814,7 +2718,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       setRows(updatedRows);
 
-      // Update edited values for tracking
       const newEditedValues = { ...editedValues };
 
       updatedRows.forEach((row) => {
@@ -2831,7 +2734,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       setEditedValues(newEditedValues);
 
-      // Update selected rows if any are selected
       if (selectedRows.length > 0) {
         const updatedSelectedRows = selectedRows.map((row) => {
           if (filteredRowIds.includes(row.id) && row.id !== excludeRowId) {
@@ -2850,7 +2752,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // Update parent component
       updateParentTableData(updatedRows, fieldID);
 
       toast.success(
@@ -2873,13 +2774,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
     ],
   );
 
-  // In NewTablePage.tsx - Update handleCellValueChange
   const handleCellValueChange = useCallback(
     (rowId: string, field: string, value: any) => {
       const originalRow = rows.find((r) => r.id === rowId);
       if (!originalRow) return;
 
-      // Save to history BEFORE making changes
       saveToHistory({
         rows: rows,
         selected: { ...selected },
@@ -2887,7 +2786,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         editedValues: { ...editedValues },
       });
 
-      // Update rows state
       const updatedRows = rows.map((r) =>
         r.id === rowId ? { ...r, [field]: value } : r,
       );
@@ -2901,14 +2799,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
           filterValue !== "",
       );
 
-      // Set recently edited cell for UI feedback
       setRecentlyEditedCell({
         columnId: field,
         rowId: rowId,
         value: value,
       });
 
-      // If apply mode is enabled AND there are active filters, apply to all filtered rows
       if (
         applyFirstCellMode.enabled &&
         hasActiveFilters &&
@@ -2920,14 +2816,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // IMPORTANT: Update selectedRows if this row is selected
       if (selected[rowId]) {
         const updatedSelectedRows = selectedRows.map((r) =>
           r.id === rowId ? { ...r, [field]: value, __modified: true } : r,
         );
         setSelectedRows(updatedSelectedRows);
 
-        // Save updated selection to localStorage
         try {
           localStorage.setItem(
             `${tableInstanceKey}_selectedRows`,
@@ -2940,13 +2834,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
           console.error("Error saving updated selection:", error);
         }
 
-        // Notify parent of selection change
         if (onSelectionChanged) {
           onSelectionChanged(updatedSelectedRows);
         }
       }
 
-      // Track edited values
       const originalValue = originalRow[field];
       if (originalValue !== value) {
         setEditedValues((prev) => ({
@@ -2958,7 +2850,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           },
         }));
 
-        // Update parent
         const isNewRow = originalRow.__isNew;
         if (isNewRow) {
           updateParentTableData(updatedRows, fieldID);
@@ -2970,7 +2861,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       }
 
-      // Call parent's onChangeInput if provided
       if (onChangeInput) {
         onChangeInput({
           target: { name: field, value },
@@ -2983,7 +2873,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       selected,
       selectedRows,
       editedValues,
-      columnFilters, // Add columnFilters to dependencies
+      columnFilters,
       applyFirstCellMode,
       sortedRows,
       fieldID,
@@ -2992,14 +2882,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
       applyFirstCellToAll,
     ],
   );
-  // Add this useEffect to sync edited values with selected rows
+
   useEffect(() => {
-    // If we have edited values and selected rows, update selected rows with edits
     if (selectedRows.length > 0 && Object.keys(editedValues).length > 0) {
       const updatedSelectedRows = selectedRows.map((row) => {
         const rowEdits = editedValues[row.id];
         if (rowEdits) {
-          // Apply edits to selected row
           const updatedRow = { ...row };
           Object.keys(rowEdits).forEach((key) => {
             if (key !== "__originalData") {
@@ -3011,13 +2899,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
         return row;
       });
 
-      // Only update if there are changes
       if (
         JSON.stringify(selectedRows) !== JSON.stringify(updatedSelectedRows)
       ) {
         setSelectedRows(updatedSelectedRows);
 
-        // Notify parent about the updated selection
         if (onSelectionChanged) {
           onSelectionChanged(updatedSelectedRows);
         }
@@ -3028,7 +2914,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
   const getModifiedDataForSave = () => {
     const modifiedData = [];
 
-    // Process edited existing rows
     for (const rowId in editedValues) {
       const editedRow = editedValues[rowId];
       const originalRow = editedRow.__originalData;
@@ -3062,15 +2947,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     }
 
-    // Process new rows
     for (const nr of newRows) {
       const newRowData: any = {
         ...nr,
-        isNew: true, // Keep track that this is a new row
+        isNew: true,
         fieldsDatanew: [],
       };
 
-      // Add all fields from the new row
       columns.forEach((col: any) => {
         const colName = col.name || col.field;
         if (colName && colName !== "select" && colName !== "actions") {
@@ -3090,6 +2973,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
     return modifiedData;
   };
+
   const renderEditableCell = (col: any, row: any) => {
     const rowEdits = editedValues[row.id];
     const cellValue =
@@ -3143,14 +3027,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
 
       case "DATE": {
-        // Single-date picker: store as 'YYYY-MM-DD'
         let selectedDate: Date | null = null;
         if (
           cellValue &&
           typeof cellValue === "string" &&
           cellValue.trim() !== ""
         ) {
-          // If a range string exists accidentally, take the first part
           const part = cellValue.includes("|")
             ? cellValue.split("|")[0]
             : cellValue;
@@ -3186,8 +3068,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       case "TEXTBOX":
       case "BOX":
-        // Use uncontrolled input to avoid re-rendering parent on every keystroke.
-        // Commit edits on blur (or Enter key) which calls the centralized handler.
         return (
           <Input
             defaultValue={cellValue}
@@ -3222,7 +3102,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         return (
           <Button
             onClick={() => {
-              // Handle button click if needed
               console.log(`Button clicked for ${col.id}`);
             }}
             disabled={isDisabled}
@@ -3247,16 +3126,15 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
 
       case "HYPERLINK": {
-        const cellValue =
+        const cellValueHyper =
           rowEdits && rowEdits[col.id] !== undefined
             ? rowEdits[col.id]
             : (row[col.id] ?? "");
 
-        // In edit mode, show input field for URL
         return (
           <Input
             type="url"
-            defaultValue={cellValue}
+            defaultValue={cellValueHyper}
             placeholder="Enter URL (e.g., https://example.com)"
             onBlur={(e: any) => {
               handleCellValueChange(row.id, col.id, e.target.value);
@@ -3277,7 +3155,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Helper function to get color configuration for a specific column and value
   const getCellColorConfig = (columnName: string, cellValue: any) => {
     if (!tableFooter || !cellValue) return null;
 
@@ -3296,7 +3173,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     return null;
   };
-  // Styled component for the colored badge with curved edges
+
   const ColoredBadge = ({
     color,
     children,
@@ -3309,13 +3186,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
         style={{
           backgroundColor: `${color}20`,
           color: color,
-          borderRadius: "9999px", // Adjust the bord  er radius to create a capsule shape
+          borderRadius: "9999px",
           padding: "4px 12px",
           minWidth: "60px",
           minHeight: "24px",
           fontSize: "12px",
           fontWeight: "500",
-          border: `1px solid ${color}40`, // Optional: subtle border with 25% opacity
+          border: `1px solid ${color}40`,
           textAlign: "center" as const,
           lineHeight: "1.2",
         }}
@@ -3324,6 +3201,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       </div>
     );
   };
+
   const renderCell = useCallback((col: any, row: any) => {
     const value = row[col.id] ?? "";
     const colorConfig = getCellColorConfig(col.id, value);
@@ -3334,7 +3212,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         ? rowEdits[col.id]
         : (row[col.id] ?? "");
 
-    // Check if this is an uploaded files table
     const isUploadedFilesCell =
       isUploadedFilesTable &&
       (col.id === "Filename" ||
@@ -3356,11 +3233,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
         />
       );
     }
-    // Handle uploaded files table cells
+
     if (isUploadedFilesCell) {
       switch (col.id) {
         case "Filename":
-          // Always show as link for uploaded files
           return (
             <a
               href={row.FileLink}
@@ -3377,12 +3253,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </a>
           );
         case "Dellink":
-          // Show delete button - check if the link exists
           const hasDellink =
             row[col.id] &&
             typeof row[col.id] === "string" &&
             row[col.id].trim() !== "";
-          // For delete, don't require selection - just check if link exists
           return (
             <Button
               color="danger"
@@ -3408,12 +3282,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </Button>
           );
         case "Approvelink":
-          // Show approve button - check if the link exists
           const hasApprovelink =
             row[col.id] &&
             typeof row[col.id] === "string" &&
             row[col.id].trim() !== "";
-          // For approve, DO require selection
           const isApproveSelected = selectedRows.some(
             (selectedRow) => selectedRow.id === row.id,
           );
@@ -3466,7 +3338,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // Check if this is an Actions column
     const isActionsColumn = col.id === "actions" || col.label === "Actions";
 
     if (isActionsColumn) {
@@ -3476,7 +3347,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       return (
         <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
-          {/* Table buttons (ADD, etc.) */}
           {tablebuttons &&
             tablebuttons.length > 0 &&
             tablebuttons.map((button: any) => (
@@ -3500,7 +3370,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               </Button>
             ))}
 
-          {/* Uploaded files actions */}
           {isUploadedFilesTable && (
             <>
               {row.Dellink && (
@@ -3547,7 +3416,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // Handle main column links
     const columnConfig = getColumnConfig(col.id);
     const inputType = columnConfig?.Inputtype || "BOX";
     const imgheight = columnConfig?.height || "BOX";
@@ -3562,7 +3430,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     if (inputType === "HYPERLINK") {
       const hyperlinkValue = cellValue;
 
-      // Helper function to format URL
       const formatUrl = (
         value: string,
       ): { url: string; displayText: string; isValid: boolean } => {
@@ -3583,7 +3450,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             isValid: true,
           };
         } catch {
-          // Check for relative paths
           if (
             trimmed.startsWith("/") ||
             trimmed.startsWith("#") ||
@@ -3596,7 +3462,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             };
           }
 
-          // Check for email
           if (trimmed.includes("@")) {
             return {
               url: `mailto:${trimmed}`,
@@ -3605,7 +3470,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             };
           }
 
-          // Default: treat as potential URL
           return {
             url: `//${trimmed}`,
             displayText: trimmed,
@@ -3616,14 +3480,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
       const formattedUrl = formatUrl(hyperlinkValue);
 
-      // If value is empty, show dash
       if (!hyperlinkValue || hyperlinkValue.trim() === "") {
         return <span className="text-muted">-</span>;
       }
 
-      // If URL is valid, create a clickable link
       if (formattedUrl.isValid) {
-        // Determine icon based on URL type
         const getUrlIcon = (url: string) => {
           if (url.startsWith("mailto:")) return "📧";
           if (url.includes("youtube.com") || url.includes("youtu.be"))
@@ -3695,7 +3556,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
       }
 
-      // For invalid URLs in view mode, still make it clickable but with warning
       return (
         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
           <span style={{ fontSize: "12px", color: "#ffc107" }}>⚠️</span>
@@ -3737,30 +3597,22 @@ const NewTablePage: React.FC<NewTableProps> = ({
         </div>
       );
     }
-    // Handle IMAGE input type for both edit and non-edit modes
+
     if (inputType === "IMAGE") {
-      // Check if value is a URL, base64 string, or image object
       let imageSrc = "";
 
       if (typeof cellValue === "string") {
-        // Check if it's a base64 string
         if (cellValue.startsWith("data:image/")) {
           imageSrc = cellValue;
-        }
-        // Check if it's a URL
-        else if (
+        } else if (
           cellValue.startsWith("http://") ||
           cellValue.startsWith("https://")
         ) {
           imageSrc = cellValue;
-        }
-        // If it's a simple string, assume it's a base64 string from database
-        else if (cellValue) {
+        } else if (cellValue) {
           imageSrc = `data:image/jpeg;base64,${cellValue}`;
         }
-      }
-      // If it's an object with image properties
-      else if (cellValue && typeof cellValue === "object") {
+      } else if (cellValue && typeof cellValue === "object") {
         imageSrc =
           cellValue.ImageURL || cellValue.base64String || cellValue.url || "";
       }
@@ -3788,7 +3640,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
                 backgroundColor: "#f5f5f5",
               }}
               onError={(e) => {
-                // Fallback if image fails to load
                 (e.target as HTMLImageElement).style.display = "none";
                 (e.target as HTMLImageElement).parentElement!.innerHTML =
                   `<div style="text-align:center;color:#999;font-size:12px">No Image</div>`;
@@ -3804,6 +3655,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
         );
       }
     }
+
+    // ==================== UPDATED MAIN LINK HANDLER WITH TABS ====================
     if (
       (col.name === "app_id" || col.id === mainColValue || isMainCol) &&
       value
@@ -3813,12 +3666,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
         e.stopPropagation();
 
         if (popupdrawersettings?.IsPopup) {
-          setIsModalOpen(true);
-          setModalData({
-            app_id: value,
-            ModuleID: row?.Moduleid || row?.ModuleID || moduleID || "",
-            defaultVisible: defaultVisible,
-          });
+          // Add to table tabs instead of directly opening modal
+          addTableTab(
+            value,
+            row?.Moduleid || row?.ModuleID || moduleID || "",
+            defaultVisible,
+            row,
+            `${columnConfig?.label || col.label || "Record"}: ${value}`,
+          );
         } else if (handleTableLinkClick) {
           handleTableLinkClick(
             value,
@@ -3826,12 +3681,16 @@ const NewTablePage: React.FC<NewTableProps> = ({
             defaultVisible,
           );
         } else {
-          setIsModalOpen(true);
-          setModalData(row);
+          addTableTab(
+            value,
+            row?.ModuleID || moduleID || "",
+            defaultVisible,
+            row,
+            `${columnConfig?.label || col.label || "Record"}: ${value}`,
+          );
         }
       };
 
-      // Apply color to linked cells if configured
       if (colorConfig) {
         return (
           <a
@@ -3863,17 +3722,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // Handle IsLink columns
     if (columnConfig?.IsLink && value) {
       const handleLinkClick = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
-
-        // Use the new function that handles HTML content
         handleLinkWithHtmlClick(row, columnConfig, value);
       };
 
-      // Apply color to linked cells if configured
       if (colorConfig) {
         return (
           <a
@@ -3906,9 +3761,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
         </a>
       );
     }
-    // Default rendering for edit mode
+
     if (editBtn) {
-      // For editable cells, show the colored badge if configured
       if (colorConfig) {
         return (
           <ColoredBadge color={colorConfig.Color}>
@@ -3919,7 +3773,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       return renderEditableCell(col, row);
     }
 
-    // Default rendering for other columns with color if configured
     if (colorConfig) {
       return (
         <ColoredBadge color={colorConfig.Color}>
@@ -3928,7 +3781,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       );
     }
 
-    // Default rendering without color
     const displayValue = value || row[col.name];
     if (displayValue && typeof displayValue === "object") {
       return displayValue.FileTypeName || JSON.stringify(displayValue) || "-";
@@ -3938,12 +3790,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
   const memoizedRenderCell = useCallback(
     (col: any, row: any) => {
-      // Your renderCell logic here
       return renderCell(col, row);
     },
     [renderCell],
   );
-  // Column reordering and resizing functions (keep your existing implementations)
+
   function onDragStartHeader(i: number, e: React.DragEvent) {
     dragIndex.current = i;
     e.dataTransfer.effectAllowed = "move";
@@ -3995,15 +3846,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
   }
+
   const exportCols = useMemo(() => {
-    // Take visibleCols and remove the select column
     const orderedExportCols = visibleCols
       .filter((col) => col.id !== "select" && col.id !== "actions")
-      .map((col) => ({ ...col })); // Create a copy to avoid reference issues
-
+      .map((col) => ({ ...col }));
     return orderedExportCols;
-  }, [visibleCols]); //
-  // Fix rowsForExport function
+  }, [visibleCols]);
+
   function rowsForExport() {
     const ids = new Set(Object.keys(selected).filter((k) => selected[k]));
     const arr = Array.from(ids);
@@ -4011,7 +3861,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       ? sortedRows.filter((r) => ids.has(r.id))
       : sortedRows;
 
-    // Return data with columns in the same order as visibleCols
     return dataRows.map((row) => {
       const orderedRow: any = {};
       exportCols.forEach((col) => {
@@ -4020,6 +3869,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       return orderedRow;
     });
   }
+
   function toTableHtml(data: any[]) {
     const head =
       "<tr>" +
@@ -4051,9 +3901,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     return `<table style="border-collapse:collapse;width:100%">${head}${body}</table>`;
   }
+
   const getFilteredData = () => {
     return sortedRows;
   };
+
   const getFilteredPdfColumns = () => {
     return columns.filter(
       (col: Column) => selectedOptions.includes(col.name) && !col.omit,
@@ -4077,7 +3929,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     headerRowsParam?: any[],
     footerRowsParam?: any[],
   ): Promise<void> => {
-    // Add safe access for headerRows and footerRows
     const safeHeaderRows = headerRowsParam || [];
     const safeFooterRows = footerRowsParam || [];
     const headerBackground = tableheaderfooterCSS?.HeaderBackground;
@@ -4107,19 +3958,15 @@ const NewTablePage: React.FC<NewTableProps> = ({
       (col: Column) => selectedOptions.includes(col.name) && !col.omit,
     ) as Column[];
 
-    // Create the table structure with merged cells
     const createMergedTableData = () => {
       const headers = filteredPdfColumns.map((col: Column) => col.name);
-      // Transform your original data to handle merged cells
       const transformedData: (
         | string
         | { content: string; rowSpan?: number; colSpan?: number; styles?: any }
       )[][] = [];
-      // Keep track of cells that should be skipped due to rowspan/colspan
       const skipCells: { [key: string]: boolean } = {};
-      // Track cell heights for specific cells
       const cellHeights: { [key: string]: number } = {};
-      // Process each row of your filtered data
+
       filteredData.forEach((item: DataItem, rowIndex: number) => {
         const row: (
           | string
@@ -4133,16 +3980,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
         let colIndex = 0;
 
         filteredPdfColumns.forEach((col: Column, originalColIndex: number) => {
-          const actualRowIndex = rowIndex + 1; // +1 because header is row 0
-          const actualColIndex = originalColIndex + 1; // +1 because your tableproperty uses 1-based indexing
+          const actualRowIndex = rowIndex + 1;
+          const actualColIndex = originalColIndex + 1;
 
-          // Check if this cell should be skipped
           const cellKey = `${rowIndex}-${originalColIndex}`;
           if (skipCells[cellKey]) {
             return;
           }
 
-          // Check if this cell has special properties
           const cellProperty = tableproperty?.find(
             (prop: any) =>
               prop.rowindex === actualRowIndex &&
@@ -4150,7 +3995,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           );
 
           if (cellProperty) {
-            // Handle alignment conversion
             let halign: "left" | "center" | "right" = "center";
             if (
               cellProperty.Align === "TOPCENTER" ||
@@ -4163,7 +4007,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               halign = "right";
             }
 
-            // Store cell height if specified
             if (cellProperty.RowHeight) {
               const cellHeight = parseInt(cellProperty.RowHeight, 10);
               if (!isNaN(cellHeight)) {
@@ -4171,7 +4014,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               }
             }
 
-            // Create cell with special properties
             const cellData = {
               content: item[col.name] ?? "",
               rowSpan: cellProperty.rowspan || 1,
@@ -4205,7 +4047,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
                   bottom: parseFloat(cellProperty.Padbottom || "0") * 10 || 3,
                   left: parseFloat(cellProperty.Padleft || "0") * 10 || 3,
                 },
-                // Apply cell-specific height
                 minCellHeight: cellProperty.RowHeight
                   ? parseInt(cellProperty.RowHeight, 10)
                   : undefined,
@@ -4214,7 +4055,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
             row.push(cellData);
 
-            // Mark cells that will be covered by this rowspan/colspan
             const rowSpan = cellProperty.rowspan || 1;
             const colSpan = cellProperty.colspan || 1;
 
@@ -4227,7 +4067,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               }
             }
           } else {
-            // Regular cell
             row.push(item[col.name] ?? "");
           }
           colIndex++;
@@ -4250,19 +4089,16 @@ const NewTablePage: React.FC<NewTableProps> = ({
     const headerLineHeight = 15;
     const footerLineHeight = 12;
 
-    // Calculate header height based on safeHeaderRows
     const headerHeight = safeHeaderRows.length * headerLineHeight + 40;
     const footerHeight = (safeFooterRows.length || 1) * footerLineHeight + 20;
     const availableContentHeight =
       pageHeight - topMargin - headerHeight - footerHeight - bottomMargin;
 
-    // ✅ base64 string comes directly from backend
     let base64Image: string | null = null;
     if (logo && logo.LogoURL) {
       base64Image = logo.LogoURL;
     }
 
-    // // ✅ Header images from headerRows
     const headerImages: { [key: string]: string } = {};
     for (const row of safeHeaderRows) {
       for (const item of row.Data) {
@@ -4294,7 +4130,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           headerY + rowIndex * headerLineHeight + 15 + headerOuterPadding;
         const positionGroups: { [key: string]: any[] } = {};
 
-        // Group items by position
         row.Data.forEach((item: any) => {
           const positionKey = item.Position || "0";
           if (!positionGroups[positionKey]) {
@@ -4311,7 +4146,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           items.forEach((item: any) => {
             if (item.IsDisplay === false) return;
 
-            // Handle image
             if (item.IMGUrl) {
               const imageKey = `${row.Index}-${item.ItemValue || "image"}`;
               if (headerImages[imageKey]) {
@@ -4328,7 +4162,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               }
             }
 
-            // Handle text
             if (item.ItemValue) {
               const fontStyle =
                 (item.IsBold ? "bold" : "") + (item.IsItallic ? "italic" : "");
@@ -4351,7 +4184,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               const paddingRight =
                 parseFloat(item.Padright || padRight.toString()) || 2;
 
-              // Calculate usable text area
               const maxTextWidth =
                 pageWidth -
                 leftMargin -
@@ -4376,7 +4208,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
               const textY = rowY + paddingTop;
 
-              // Background for text
               if (item.bgcolor && text) {
                 doc.setFillColor(item.bgcolor);
                 doc.rect(
@@ -4390,7 +4221,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
               if (item.FontColor) doc.setTextColor(item.FontColor);
 
-              // Wrap long text
               const wrappedText = doc.splitTextToSize(text, maxTextWidth);
               doc.text(wrappedText, textX, textY);
 
@@ -4405,7 +4235,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         });
       });
 
-      // Draw header border if needed
       if (outsideBorder) {
         doc.setDrawColor(parseInt(borderColor.substring(1), 16) || 0);
         doc.setLineWidth(0.5);
@@ -4434,13 +4263,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
       const footerLineHeight = 20;
       const footerPadding = 15;
 
-      // Outer padding inside footer box
       const footerOuterPadding = 10;
 
       let totalFooterHeight = safeFooterRows.length * footerLineHeight + 30;
       const footerY = pageHeight - totalFooterHeight - footerPadding - 15;
 
-      // Draw footer background box with padding
       if (isValidColor(footerBackground)) {
         doc.setFillColor(footerBackground);
         doc.rect(
@@ -4457,7 +4284,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           footerY + rowIndex * footerLineHeight + 15 + footerOuterPadding;
         const positionGroups: { [key: string]: any[] } = {};
 
-        // Group items by position
         row.Data.forEach((item: any) => {
           const positionKey = item.Position || "0";
           if (!positionGroups[positionKey]) {
@@ -4474,7 +4300,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           items.forEach((item: any) => {
             if (item.IsDisplay === false) return;
 
-            // Handle image
             if (item.IMGUrl) {
               const imageKey = `${row.Index}-${item.ItemValue || "image"}`;
               if (footerImages[imageKey]) {
@@ -4491,7 +4316,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               }
             }
 
-            // Handle text
             if (item.ItemValue) {
               const fontStyle =
                 (item.IsBold ? "bold" : "") + (item.IsItallic ? "italic" : "");
@@ -4514,7 +4338,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
               const paddingRight =
                 parseFloat(item.Padright || padRight.toString()) || 2;
 
-              // Calculate text area inside footer box
               const maxTextWidth =
                 pageWidth -
                 leftMargin -
@@ -4539,7 +4362,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
               const textY = rowY + paddingTop;
 
-              // Background for text
               if (item.bgcolor && text) {
                 doc.setFillColor(item.bgcolor);
                 doc.rect(
@@ -4553,7 +4375,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
               if (item.FontColor) doc.setTextColor(item.FontColor);
 
-              // Wrap text if too long
               const wrappedText = doc.splitTextToSize(text, maxTextWidth);
               doc.text(wrappedText, textX, textY);
 
@@ -4568,7 +4389,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         });
       });
 
-      // Draw footer border if needed
       if (outsideBorder) {
         doc.setDrawColor(parseInt(borderColor.substring(1), 16) || 0);
         doc.setLineWidth(0.5);
@@ -4581,7 +4401,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     };
 
-    // Create columnStyles based on tablefooter ColWidth values
     const tableWidth = pageWidth - leftMargin - rightMargin;
     const columnStyles: { [key: number]: { cellWidth: number } } = {};
     filteredPdfColumns.forEach((col, index) => {
@@ -4633,11 +4452,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
         lineWidth: outsideBorder || insideBorder ? 0.1 : 0,
         lineColor: outsideBorder || insideBorder ? [0, 0, 0] : [255, 255, 255],
       },
-      headStyles: headerStyles, // Apply the formatted header styles
+      headStyles: headerStyles,
       theme: "striped",
       columnStyles: columnStyles,
       didParseCell: (data) => {
-        // ✅ Only apply custom rowHeight to BODY cells, not header/footer
         if (data.section === "body") {
           const rowIndex = data.row.index + 1;
           const colIndex = data.column.index + 1;
@@ -4649,7 +4467,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       },
       didDrawCell: (data) => {
-        // ✅ Apply custom row height only for body cells
         if (data.section === "body") {
           const rowIndex = data.row.index + 1;
           const colIndex = data.column.index + 1;
@@ -4660,7 +4477,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
           }
         }
 
-        // ✅ Keep underline for header if needed
         if (data.section === "head" && tableFormatting?.IsUnderline) {
           doc.setDrawColor(
             tableFormatting?.FontColor
@@ -4680,7 +4496,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         addHeader(doc);
         addFooter(doc);
 
-        // Draw the main border AFTER drawing header and footer
         doc.setDrawColor(0);
         doc.setLineWidth(1);
         doc.rect(15, 15, pageWidth - 30, pageHeight - 30);
@@ -4709,10 +4524,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     const filteredData = rowsForExport();
     const workbook = XLSX.utils.book_new();
 
-    // Use exportCols for headers (same order as table)
     const headers = exportCols.map((col: any) => col.label);
 
-    // Map data in the same order as exportCols
     const data = filteredData.map((item: any) => {
       return exportCols.map((col: any) => item[col.id] ?? "");
     });
@@ -4722,6 +4535,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
     XLSX.utils.book_append_sheet(workbook, worksheet, "Data");
     XLSX.writeFile(workbook, `${filename}.xlsx`);
   };
+
   const convertToDocx = () => {
     try {
       const filteredData = rowsForExport();
@@ -4762,7 +4576,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Add this function near your other export functions (convertToPDF, convertToExcel, convertToDocx)
   const convertToCSV = () => {
     try {
       const filteredData = rowsForExport();
@@ -4799,14 +4612,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
   };
 
-  // Add these functions after your existing export functions (convertToPDF, convertToExcel, etc.)
-
   const exportJSON = () => {
     const data = rowsForExport();
-    // Create ordered JSON output matching table order
     const orderedData = data.map((row: any) => {
       const orderedRow: any = {};
-      // Add columns in export order (same as table order)
       exportCols.forEach((col) => {
         orderedRow[col.id] = row[col.id] ?? "";
       });
@@ -4819,6 +4628,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       JSON.stringify(orderedData, null, 2),
     );
   };
+
   const exportXML = () => {
     const data = rowsForExport();
     const xml =
@@ -4858,20 +4668,17 @@ const NewTablePage: React.FC<NewTableProps> = ({
       downloadBlob(`${filename || "print"}.html`, "text/html", html);
     }
   };
-  // Make sure escapeCsv function exists - if not, add it near other utility functions
+
   function escapeCsv(s: any): string {
     if (s == null || s === undefined) return "";
     const str = String(s);
-    // Escape quotes by doubling them
     const escaped = str.replace(/"/g, '""');
-    // Wrap in quotes if contains comma, newline, or quote
     if (/[",\n]/.test(escaped)) {
       return `"${escaped}"`;
     }
     return escaped;
   }
 
-  // Column visibility management
   const handleCheckboxChange =
     (option: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
       if (event.target.checked) {
@@ -4944,6 +4751,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       setAnchorEl(null);
     }
   };
+
   const open = Boolean(anchorEl);
   const id = open ? "checkbox-popover" : undefined;
 
@@ -4961,13 +4769,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
 
     if (handleSaveData) {
-      // Call the parent's save function
       handleSaveData(modifiedData);
-
-      // Clear new rows after successful save
       setNewRows([]);
-
-      // Reset edit states
       setEditedValues({});
       setModifiedRows({});
       setLocalEditMode(false);
@@ -4975,7 +4778,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         setEditBtn(false);
       }
       localStorage.removeItem(tableInstanceKey);
-
       setNewRows([]);
     } else {
       toast.error("Save functionality not available");
@@ -4984,13 +4786,12 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
   useEffect(() => {
     return () => {
-      // Only clean up if we're not in edit mode
       if (!localEditMode) {
         localStorage.removeItem(tableInstanceKey);
       }
     };
   }, [localEditMode, tableInstanceKey]);
-  // Add this useEffect after your other useEffect hooks
+
   useEffect(() => {
     const saveSelection = () => {
       try {
@@ -5009,13 +4810,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
       }
     };
 
-    // Debounce the save to prevent too many writes
     const timer = setTimeout(saveSelection, 500);
     return () => clearTimeout(timer);
   }, [selected, tableInstanceKey]);
 
   const handleLinkWithHtmlClick = (row: any, columnConfig: any, value: any) => {
-    // Check for HTMLBODY in various possible field names
     const htmlBody =
       row.HTMLBODY ||
       row.htmlbody ||
@@ -5025,32 +4824,25 @@ const NewTablePage: React.FC<NewTableProps> = ({
       row.html_content ||
       "";
 
-    // ALWAYS open the modal when IsLink is true
     setSelectedHtmlContent(htmlBody);
     setHtmlModalTitle(`${columnConfig?.label || "Content"}: ${value || ""}`);
     setHtmlModalOpen(true);
   };
 
-  // Also, update the handleCellValueChangeWithApply function to use sortedRows
   const handleCellValueChangeWithApply = useCallback(
     (rowId: string, field: string, value: any) => {
-      // First, call the original handleCellValueChange
       handleCellValueChange(rowId, field, value);
 
-      // If we're in apply-first-cell mode
       if (applyFirstCellMode && sortedRows.length > 0) {
         const firstFilteredRow = sortedRows[0];
 
-        // Check if this is the first FILTERED row's cell being edited
         if (rowId === firstFilteredRow.id) {
-          // Save the original and new value
           setApplyColumnData({
             columnId: field,
             originalValue: firstFilteredRow[field],
             newValue: value,
           });
 
-          // Apply to all other filtered rows (excluding the first one)
           applyFirstCellToAll(field, value, firstFilteredRow.id);
         }
       }
@@ -5074,7 +4866,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
     const { columnId, rowId, value } = recentlyEditedCell;
 
-    // Find if the edited row is in filtered rows
     const editedRowIndex = sortedRows.findIndex((row) => row.id === rowId);
 
     if (editedRowIndex === -1) {
@@ -5085,10 +4876,8 @@ const NewTablePage: React.FC<NewTableProps> = ({
       return;
     }
 
-    // Apply to all filtered rows
     applyFirstCellToAll(columnId!, value, rowId!);
 
-    // Disable the apply mode
     setApplyFirstCellMode({
       enabled: false,
       columnId: null,
@@ -5099,25 +4888,21 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
   const handleReplaceButtonClick = async (button: any) => {
     try {
-      // Get the PostedJson data from saveData using the field IDs
       const postedJson: any[] = [];
       const fieldData = information?.Data || [];
 
-      // Collect data from all fields
       if (fieldData && fieldData.length > 0) {
         fieldData.forEach((dataObj: any) => {
           if (dataObj?.Fields && dataObj.Fields.length > 0) {
             dataObj.Fields.forEach((fieldGroup: any) => {
               if (fieldGroup?.Values && fieldGroup.Values.length > 0) {
                 fieldGroup.Values.forEach((field: any) => {
-                  // Check if this field ID is in the button's buttonFields array
                   const isInButtonFields = button.buttonFields.some(
                     (btnField: any) =>
                       Number(btnField.FieldID) === Number(field.FieldID),
                   );
 
                   if (isInButtonFields) {
-                    // Try to get the field value from multiple sources
                     const fieldValue =
                       saveData[field.FieldName] ||
                       field.FieldValue ||
@@ -5137,16 +4922,14 @@ const NewTablePage: React.FC<NewTableProps> = ({
         });
       }
 
-      // Store the data for the drawer
       setReplaceButtonData({
         buttonId: button.ButtonID,
         moduleID: menuID || moduleID,
-        recordID: button.ButtonID.toString(), // Use ButtonID as recordID
+        recordID: button.ButtonID.toString(),
         postedJson: postedJson,
-        apiUrl: button.ButtonURL, // Store the API URL
+        apiUrl: button.ButtonURL,
       });
 
-      // Open the drawer
       setReplaceDrawerOpen(true);
 
       toast.success("Opening REPLACE form...", {
@@ -5159,14 +4942,42 @@ const NewTablePage: React.FC<NewTableProps> = ({
         position: "top-right",
         autoClose: 3000,
       });
-    } finally {
     }
   };
-  // Add this function to close the drawer
+
   const handleCloseReplaceDrawer = () => {
     setReplaceDrawerOpen(false);
     setReplaceButtonData(null);
   };
+
+  const collectSelectedTableData = () => {
+    // Helper function to collect selected table data if needed
+    if (selectedRows.length > 0) {
+      return selectedRows.map((row) => {
+        const rowData: any = {};
+        columns.forEach((col: any) => {
+          const colName = col.name || col.field;
+          if (colName && colName !== "select" && colName !== "actions") {
+            rowData[colName] = row[colName] || "";
+          }
+        });
+        return rowData;
+      });
+    }
+    return [];
+  };
+
+  const shouldShowTabBar =
+    isOpenonTables && tableTabs.length > 0 && !isOpenwithTabs;
+  const displayTabs = isExternallyManaged ? externalTabs : internalTabs;
+  const displaySelectedTabId = isExternallyManaged
+    ? externalSelectedTabId
+    : internalSelectedTabId;
+
+  // Conditionally render the tab bar
+  // Only render modal for internally managed tabs
+  const shouldRenderModal = !isExternallyManaged;
+
   return (
     <Card
       className={field?.IsBorderApply ? "border-1" : ""}
@@ -5182,6 +4993,596 @@ const NewTablePage: React.FC<NewTableProps> = ({
             }
       }
     >
+      <CardBody>
+        {/* ==================== TAB BAR ABOVE TABLE ==================== */}
+        {shouldShowTabBar && (
+          <div
+            className="mb-3"
+            style={{
+              borderBottom: "1px solid #dee2e6",
+              backgroundColor: "#fff",
+              marginBottom: "16px",
+            }}
+          >
+            {/* Existing tab bar JSX - unchanged */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px",
+                backgroundColor: "#f8f9fa",
+                borderRadius: "8px 8px 0 0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "#6c757d",
+                    fontWeight: 500,
+                  }}
+                >
+                  📑 Open Entries ({tableTabs.length}):
+                </span>
+                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                  {tableTabs.map((tab) => (
+                    <div
+                      key={tab.id}
+                      onClick={() => handleTableTabClick(tab)}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "4px 8px 4px 12px",
+                        backgroundColor:
+                          selectedTableTabId === tab.id ? "#007bff" : "#e9ecef",
+                        color:
+                          selectedTableTabId === tab.id ? "#fff" : "#495057",
+                        borderRadius: "6px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        transition: "all 0.2s ease",
+                        border:
+                          selectedTableTabId === tab.id
+                            ? "none"
+                            : "1px solid #dee2e6",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (selectedTableTabId !== tab.id) {
+                          e.currentTarget.style.backgroundColor = "#dee2e6";
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedTableTabId !== tab.id) {
+                          e.currentTarget.style.backgroundColor = "#e9ecef";
+                        }
+                      }}
+                    >
+                      <span
+                        style={{
+                          maxWidth: "200px",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {tab.name}
+                      </span>
+                      <button
+                        onClick={(e) => closeTableTab(tab.id, e)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "16px",
+                          fontWeight: "bold",
+                          color:
+                            selectedTableTabId === tab.id ? "#fff" : "#6c757d",
+                          padding: "0 2px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginLeft: "4px",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = "#dc3545";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color =
+                            selectedTableTabId === tab.id ? "#fff" : "#6c757d";
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {tableTabs.length > 0 && (
+                <button
+                  onClick={clearAllTabs}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#dc3545",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = "#f8d7da";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = "transparent";
+                  }}
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Toolbar */}
+        <div
+          className="mb-3 flex flex-wrap items-center gap-2"
+          style={{ position: "relative" }}
+        >
+          <input
+            value={qLive}
+            onChange={(e) => setQLive(e.target.value)}
+            placeholder="Global search…"
+            className="h-9 w-64 rounded-md border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+
+          <div
+            className="ml-auto flex flex-wrap gap-2"
+            style={{ position: "relative" }}
+          >
+            <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-200">
+              <input
+                type="checkbox"
+                id="apply-first-cell-mode"
+                checked={applyFirstCellMode.enabled}
+                onChange={(e) => {
+                  const enabled = e.target.checked;
+
+                  if (enabled) {
+                    if (!recentlyEditedCell) {
+                      toast.error(
+                        <div>
+                          <strong>No recent edit found!</strong>
+                          <br />
+                          <small>
+                            1. Edit a cell in a filtered column
+                            <br />
+                            2. Then check this box to apply to all filtered rows
+                          </small>
+                        </div>,
+                        {
+                          position: "top-right",
+                          autoClose: 5000,
+                          style: { top: "50px" },
+                        },
+                      );
+                      return;
+                    }
+
+                    const isInFiltered = sortedRows.some(
+                      (row) => row.id === recentlyEditedCell.rowId,
+                    );
+                    if (!isInFiltered) {
+                      toast.error(
+                        "Edited cell is not in filtered results. Please edit a visible cell first.",
+                        {
+                          position: "top-right",
+                          autoClose: 4000,
+                        },
+                      );
+                      return;
+                    }
+
+                    setApplyFirstCellMode({
+                      enabled: true,
+                      columnId: recentlyEditedCell.columnId,
+                      value: recentlyEditedCell.value,
+                      rowId: recentlyEditedCell.rowId,
+                    });
+
+                    applyRecentEditToAllFiltered();
+                  } else {
+                    setApplyFirstCellMode({
+                      enabled: false,
+                      columnId: null,
+                      value: null,
+                      rowId: null,
+                    });
+                  }
+                }}
+                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                title="Apply recent edit to all filtered rows"
+              />
+              <label
+                htmlFor="apply-first-cell-mode"
+                className="text-sm font-medium text-blue-700 whitespace-nowrap cursor-pointer"
+                title="1. Edit a cell → 2. Check this to apply to all filtered rows"
+              >
+                Apply First Cell
+              </label>
+
+              {/* Show what will be applied */}
+              {recentlyEditedCell && (
+                <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                  <div>
+                    Recent edit: <strong>{recentlyEditedCell.columnId}</strong>{" "}
+                    = "{recentlyEditedCell.value}"
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {recentlyEditedCell && (
+              <Button
+                onClick={() => {
+                  setRecentlyEditedCell(null);
+                  setApplyFirstCellMode({
+                    enabled: false,
+                    columnId: null,
+                    value: null,
+                    rowId: null,
+                  });
+                  toast.info("Cleared recent edit", {
+                    position: "top-right",
+                    autoClose: 2000,
+                  });
+                }}
+                style={{
+                  backgroundColor: "#f8f9fa",
+                  color: "#6c757d",
+                  border: "1px solid #dee2e6",
+                }}
+                size="sm"
+              >
+                Clear Edit
+              </Button>
+            )}
+
+            {tableButtons
+              .filter((btn) => btn.visibility !== false)
+              .map(renderDynamicButton)}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div
+          ref={tableWrapRef}
+          className={clsx("relative rounded-xl border bg-white overflow-auto")}
+          style={
+            virtualize
+              ? { maxHeight: `${pageSize * rowH + 56}px`, overflowY: "auto" }
+              : isFreezeHeader
+                ? { maxHeight: "calc(100vh - 300px)", overflowY: "auto" }
+                : undefined
+          }
+        >
+          <div ref={containerRef} className="relative">
+            <table className="w-full border-collapse">
+              <thead
+                className={isFreezeHeader ? "sticky top-0 z-30 bg-white" : ""}
+              >
+                <tr className="bg-gradient-to-r from-indigo-50 via-fuchsia-50 to-pink-50">
+                  {visibleCols.map((c, i) => (
+                    <th
+                      key={c.id}
+                      draggable={c.id !== "select"}
+                      onDragStart={(e) => onDragStartHeader(i, e as any)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => onDropHeader(i, e as any)}
+                      onClick={(e) =>
+                        c.id !== "select" &&
+                        toggleSort(c.id, (e as any).shiftKey)
+                      }
+                      className={clsx(
+                        "relative px-3 py-2 text-sm font-semibold whitespace-nowrap group",
+                        c.pin === "left" && "sticky left-0 z-40",
+                        c.pin === "right" && "sticky right-0 z-40",
+                      )}
+                      style={{ width: c.width, minWidth: c.width }}
+                      title="Click to sort • Shift+Click for multi-sort • Drag edge to resize • Drag to reorder"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <span>{c.label || ""}</span>
+                        {c.id !== "select" && (
+                          <SortIcon
+                            active={sortState.find((s) => s.id === c.id)}
+                            desc={sortState.find((s) => s.id === c.id)?.desc}
+                          />
+                        )}
+                      </span>
+
+                      {c.id === "select" && (
+                        <input
+                          type="checkbox"
+                          aria-label="Select page rows"
+                          checked={allPageSelected}
+                          onChange={toggleAllPage}
+                        />
+                      )}
+                      {c.id !== "select" && c.id !== "actions" && (
+                        <>
+                          <div
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              startResize(c.id, e as any);
+                            }}
+                            className={clsx(
+                              "absolute right-0 top-0 h-full w-1.5 cursor-col-resize transition-all duration-150",
+                              "hover:w-2 hover:bg-indigo-500",
+                              "active:w-2 active:bg-indigo-600",
+                              "group-hover:bg-indigo-300/50",
+                              snapX !== null &&
+                                resizing.current?.colId === c.id &&
+                                "bg-indigo-600 w-2",
+                            )}
+                            style={{
+                              backgroundColor:
+                                snapX !== null &&
+                                resizing.current?.colId === c.id
+                                  ? "rgb(79, 70, 229)"
+                                  : undefined,
+                              boxShadow:
+                                snapX !== null &&
+                                resizing.current?.colId === c.id
+                                  ? "0 0 0 2px rgba(79, 70, 229, 0.2)"
+                                  : undefined,
+                            }}
+                            title="Drag to resize column"
+                          />
+                        </>
+                      )}
+                    </th>
+                  ))}
+                </tr>
+
+                <tr className="bg-gradient-to-r from-indigo-50 via-fuchsia-50 to-pink-50">
+                  {visibleCols.map((c) => {
+                    const colConfig = getColumnConfig(c.id);
+                    const inputType = colConfig?.Inputtype || "BOX";
+                    const fVal = columnFilters[c.id];
+
+                    return (
+                      <th
+                        key={c.id + "_filter"}
+                        className={clsx(
+                          "px-3 py-2 text-left text-sm",
+                          c.pin === "left" && "sticky left-0 z-30",
+                          c.pin === "right" && "sticky right-0 z-30",
+                        )}
+                        style={{ width: c.width, minWidth: c.width }}
+                      >
+                        {c.id !== "select" && c.id !== "actions" && (
+                          <>
+                            {inputType === "DROPDOWN" ? (
+                              <AsyncSelect
+                                cacheOptions
+                                loadOptions={(inputValue: string) =>
+                                  fetchDropdownData(c.id, inputValue)
+                                }
+                                defaultOptions={columnDropdownData[c.id] || []}
+                                value={
+                                  fVal
+                                    ? typeof fVal === "object"
+                                      ? fVal
+                                      : { label: fVal, value: fVal }
+                                    : null
+                                }
+                                onChange={(opt: any) =>
+                                  handleColumnFilterChange(c.id, opt)
+                                }
+                                isClearable
+                              />
+                            ) : inputType === "DATE" ? (
+                              <ReactDatePicker
+                                selectsRange
+                                onChange={([start, end]) => {
+                                  const value =
+                                    start && end
+                                      ? `${moment(start).format("YYYY-MM-DD")}|${moment(end).format("YYYY-MM-DD")}`
+                                      : "";
+                                  handleColumnFilterChange(c.id, value);
+                                }}
+                                isClearable
+                              />
+                            ) : (
+                              <input
+                                type="text"
+                                value={fVal ?? ""}
+                                onChange={(e) =>
+                                  handleColumnFilterChange(c.id, e.target.value)
+                                }
+                                className="w-full rounded border px-2 py-1 text-sm"
+                                placeholder={`Filter ${c.label || ""}`}
+                              />
+                            )}
+                          </>
+                        )}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {virtualize && (
+                  <tr>
+                    <td
+                      colSpan={visibleCols.length}
+                      style={{ height: virt.padTop }}
+                    />
+                  </tr>
+                )}
+
+                {renderRows.map((r, rowIdx) => (
+                  <tr
+                    key={r.id}
+                    className={clsx(
+                      "text-sm",
+                      rowIdx % 2 ? "bg-gray-50" : undefined,
+                    )}
+                  >
+                    {visibleCols.map((c) => {
+                      const value = r[c.id] ?? "";
+                      const colorConfig = getCellColorConfig(c.id, value);
+
+                      return (
+                        <td
+                          key={c.id}
+                          className={clsx(
+                            "px-3 py-2",
+                            c.pin === "left" &&
+                              "sticky left-0 z-[5] bg-white shadow-[2px_0_0_#e5e7eb]",
+                            c.pin === "right" &&
+                              "sticky right-0 z-[5] bg-white shadow-[-2px_0_0_#e5e7eb]",
+                          )}
+                          style={{
+                            width: c.width,
+                            minWidth: c.width,
+                            textAlign: colorConfig ? "center" : "left",
+                            verticalAlign: "middle",
+                          }}
+                        >
+                          {renderCell(c, r)}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+
+                {virtualize && (
+                  <tr>
+                    <td
+                      colSpan={visibleCols.length}
+                      style={{ height: virt.padBottom }}
+                    />
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {snapX != null && tableWrapRef.current && (
+              <div
+                className="pointer-events-none absolute top-0 bottom-0 w-px bg-indigo-500/60"
+                style={{
+                  left:
+                    snapX -
+                    (tableWrapRef.current?.getBoundingClientRect().left || 0) +
+                    "px",
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Pagination */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="rounded-md border px-2 py-1 text-sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={pageSafe === 1}
+            >
+              Prev
+            </button>
+            <div className="text-sm">
+              Page {pageSafe} / {totalPages}
+            </div>
+            <button
+              type="button"
+              className="rounded-md border px-2 py-1 text-sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={pageSafe === totalPages}
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              className={
+                "ml-2 rounded-md border px-2 py-1 text-sm " +
+                (virtualize ? "bg-indigo-600 text-white" : "bg-white")
+              }
+              onClick={handleVirtualizeToggle}
+              title={
+                virtualize
+                  ? "Showing all rows (click to paginate)"
+                  : "Show all rows"
+              }
+            >
+              {virtualize ? "Showing all" : "Show all"}
+            </button>
+            <select
+              value={pageSize}
+              onChange={(e) => setPageSize(Number((e.target as any).value))}
+              className="ml-2 h-9 rounded-md border bg-white px-2 text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2 text-sm">
+            <span className="rounded bg-gray-100 px-2 py-1">
+              {Object.values(selected).filter(Boolean).length} selected
+            </span>
+          </div>
+        </div>
+
+        {/* Footer stats */}
+        {tableFooter && tableFooter?.length > 0 && (
+          <div className="flex justify-end gap-8 mt-3">
+            {tableFooter?.map((footer: any) => (
+              <div key={footer.Keyname}>
+                <span
+                  style={{
+                    fontWeight: "bold",
+                    fontSize: "14px",
+                    color: "black",
+                  }}
+                >
+                  {footer.Keyname}
+                </span>
+                :
+                <span style={{ fontSize: "14px", color: "black" }}>
+                  {footer.KeyValue}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="sticky bottom-2 mt-4 inline-flex items-center gap-3 rounded-xl border bg-white px-3 py-2 text-sm shadow">
+          <div>
+            <b>{sortedRows.length}</b> rows
+          </div>
+          <div className="hidden sm:block">
+            Virtualized: <b>{String(virtualize)}</b>
+          </div>
+        </div>
+      </CardBody>
+
+      {/* Modal for AutoCall Content */}
       <Modal
         isOpen={isModalOpen}
         centered
@@ -5209,7 +5610,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
             }}
           >
             <Button className="b0" onClick={() => setIsModalOpen(false)}>
-              Cancel
+              Close
             </Button>
           </div>
           <div>
@@ -5223,491 +5624,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
           </div>
         </ModalBody>
       </Modal>
+
       <HtmlContentModal
         isOpen={htmlModalOpen}
         onClose={() => setHtmlModalOpen(false)}
         htmlContent={selectedHtmlContent}
         title={htmlModalTitle}
       />
-      <CardBody>
-        <div style={{ position: "relative" }}>
-          {/* Toolbar */}
-          <div
-            className="mb-3 flex flex-wrap items-center gap-2"
-            style={{ position: "relative" }}
-          >
-            <input
-              value={qLive}
-              onChange={(e) => setQLive(e.target.value)}
-              placeholder="Global search…"
-              className="h-9 w-64 rounded-md border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            />
-
-            <div
-              className="ml-auto flex flex-wrap gap-2"
-              style={{ position: "relative" }}
-            >
-              {/* <label className="flex items-center gap-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={virtualize}
-                    onChange={e => setVirtualize(e.target.checked)}
-                  />
-                  Virtualize
-                </label> */}
-              <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-md border border-blue-200">
-                <input
-                  type="checkbox"
-                  id="apply-first-cell-mode"
-                  checked={applyFirstCellMode.enabled}
-                  onChange={(e) => {
-                    const enabled = e.target.checked;
-
-                    if (enabled) {
-                      // Check if we have a recent edit
-                      if (!recentlyEditedCell) {
-                        toast.error(
-                          <div>
-                            <strong>No recent edit found!</strong>
-                            <br />
-                            <small>
-                              1. Edit a cell in a filtered column
-                              <br />
-                              2. Then check this box to apply to all filtered
-                              rows
-                            </small>
-                          </div>,
-                          {
-                            position: "top-right",
-                            autoClose: 5000,
-                            style: { top: "50px" },
-                          },
-                        );
-                        return;
-                      }
-
-                      // Check if the edited cell is in filtered rows
-                      const isInFiltered = sortedRows.some(
-                        (row) => row.id === recentlyEditedCell.rowId,
-                      );
-                      if (!isInFiltered) {
-                        toast.error(
-                          "Edited cell is not in filtered results. Please edit a visible cell first.",
-                          {
-                            position: "top-right",
-                            autoClose: 4000,
-                          },
-                        );
-                        return;
-                      }
-
-                      // Enable apply mode and apply immediately
-                      setApplyFirstCellMode({
-                        enabled: true,
-                        columnId: recentlyEditedCell.columnId,
-                        value: recentlyEditedCell.value,
-                        rowId: recentlyEditedCell.rowId,
-                      });
-
-                      // Apply to all filtered rows
-                      applyRecentEditToAllFiltered();
-                    } else {
-                      // Disable mode
-                      setApplyFirstCellMode({
-                        enabled: false,
-                        columnId: null,
-                        value: null,
-                        rowId: null,
-                      });
-                    }
-                  }}
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  title="Apply recent edit to all filtered rows"
-                />
-                <label
-                  htmlFor="apply-first-cell-mode"
-                  className="text-sm font-medium text-blue-700 whitespace-nowrap cursor-pointer"
-                  title="1. Edit a cell → 2. Check this to apply to all filtered rows"
-                >
-                  Apply First Cell
-                </label>
-
-                {/* Show what will be applied */}
-                {recentlyEditedCell && (
-                  <div className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
-                    <div>
-                      Recent edit:{" "}
-                      <strong>{recentlyEditedCell.columnId}</strong> = "
-                      {recentlyEditedCell.value}"
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {recentlyEditedCell && (
-                <Button
-                  onClick={() => {
-                    setRecentlyEditedCell(null);
-                    setApplyFirstCellMode({
-                      enabled: false,
-                      columnId: null,
-                      value: null,
-                      rowId: null,
-                    });
-                    toast.info("Cleared recent edit", {
-                      position: "top-right",
-                      autoClose: 2000,
-                    });
-                  }}
-                  style={{
-                    backgroundColor: "#f8f9fa",
-                    color: "#6c757d",
-                    border: "1px solid #dee2e6",
-                  }}
-                  size="sm"
-                >
-                  Clear Edit
-                </Button>
-              )}
-
-              {/* In the toolbar section, update the ButtonDropdown component */}
-              {tableButtons
-                .filter((btn) => btn.visibility !== false)
-                .map(renderDynamicButton)}
-            </div>
-          </div>
-
-          {/* Table */}
-          <div
-            ref={tableWrapRef}
-            className={clsx(
-              "relative rounded-xl border bg-white overflow-auto",
-            )}
-            style={
-              virtualize
-                ? { maxHeight: `${pageSize * rowH + 56}px`, overflowY: "auto" }
-                : isFreezeHeader
-                  ? { maxHeight: "calc(100vh - 300px)", overflowY: "auto" }
-                  : undefined
-            }
-          >
-            <div ref={containerRef} className="relative">
-              <table className="w-full border-collapse">
-                <thead
-                  className={isFreezeHeader ? "sticky top-0 z-30 bg-white" : ""}
-                >
-                  {/* Column header row */}
-                  {/* Column header row */}
-                  <tr className="bg-gradient-to-r from-indigo-50 via-fuchsia-50 to-pink-50">
-                    {visibleCols.map((c, i) => (
-                      <th
-                        key={c.id}
-                        draggable={c.id !== "select"}
-                        onDragStart={(e) => onDragStartHeader(i, e as any)}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => onDropHeader(i, e as any)}
-                        onClick={(e) =>
-                          c.id !== "select" &&
-                          toggleSort(c.id, (e as any).shiftKey)
-                        }
-                        className={clsx(
-                          "relative px-3 py-2 text-sm font-semibold whitespace-nowrap group",
-                          c.pin === "left" && "sticky left-0 z-40",
-                          c.pin === "right" && "sticky right-0 z-40",
-                        )}
-                        style={{ width: c.width, minWidth: c.width }}
-                        title="Click to sort • Shift+Click for multi-sort • Drag edge to resize • Drag to reorder"
-                      >
-                        <span className="inline-flex items-center gap-2">
-                          <span>{c.label || ""}</span>
-                          {c.id !== "select" && (
-                            <SortIcon
-                              active={sortState.find((s) => s.id === c.id)}
-                              desc={sortState.find((s) => s.id === c.id)?.desc}
-                            />
-                          )}
-                        </span>
-
-                        {c.id === "select" && (
-                          <input
-                            type="checkbox"
-                            aria-label="Select page rows"
-                            checked={allPageSelected}
-                            onChange={toggleAllPage}
-                          />
-                        )}
-                        {c.id !== "select" && c.id !== "actions" && (
-                          <>
-                            {/* Resize handle - visible on hover */}
-                            <div
-                              onMouseDown={(e) => {
-                                e.stopPropagation();
-                                startResize(c.id, e as any);
-                              }}
-                              className={clsx(
-                                "absolute right-0 top-0 h-full w-1.5 cursor-col-resize transition-all duration-150",
-                                "hover:w-2 hover:bg-indigo-500",
-                                "active:w-2 active:bg-indigo-600",
-                                "group-hover:bg-indigo-300/50",
-                                snapX !== null &&
-                                  resizing.current?.colId === c.id &&
-                                  "bg-indigo-600 w-2",
-                              )}
-                              style={{
-                                backgroundColor:
-                                  snapX !== null &&
-                                  resizing.current?.colId === c.id
-                                    ? "rgb(79, 70, 229)"
-                                    : undefined,
-                                boxShadow:
-                                  snapX !== null &&
-                                  resizing.current?.colId === c.id
-                                    ? "0 0 0 2px rgba(79, 70, 229, 0.2)"
-                                    : undefined,
-                              }}
-                              title="Drag to resize column"
-                            />
-                          </>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-
-                  {/* Filters row: per-column filter inputs */}
-                  <tr className="bg-gradient-to-r from-indigo-50 via-fuchsia-50 to-pink-50">
-                    {visibleCols.map((c) => {
-                      const colConfig = getColumnConfig(c.id);
-                      const inputType = colConfig?.Inputtype || "BOX";
-                      const fVal = columnFilters[c.id];
-
-                      return (
-                        <th
-                          key={c.id + "_filter"}
-                          className={clsx(
-                            "px-3 py-2 text-left text-sm",
-                            c.pin === "left" && "sticky left-0 z-30",
-                            c.pin === "right" && "sticky right-0 z-30",
-                          )}
-                          style={{ width: c.width, minWidth: c.width }}
-                        >
-                          {c.id !== "select" && c.id !== "actions" && (
-                            <>
-                              {inputType === "DROPDOWN" ? (
-                                <AsyncSelect
-                                  cacheOptions
-                                  loadOptions={(inputValue: string) =>
-                                    fetchDropdownData(c.id, inputValue)
-                                  }
-                                  defaultOptions={
-                                    columnDropdownData[c.id] || []
-                                  }
-                                  value={
-                                    fVal
-                                      ? typeof fVal === "object"
-                                        ? fVal
-                                        : { label: fVal, value: fVal }
-                                      : null
-                                  }
-                                  onChange={(opt: any) =>
-                                    handleColumnFilterChange(c.id, opt)
-                                  }
-                                  isClearable
-                                />
-                              ) : inputType === "DATE" ? (
-                                <ReactDatePicker
-                                  selectsRange
-                                  onChange={([start, end]) => {
-                                    const value =
-                                      start && end
-                                        ? `${moment(start).format("YYYY-MM-DD")}|${moment(end).format("YYYY-MM-DD")}`
-                                        : "";
-                                    handleColumnFilterChange(c.id, value);
-                                  }}
-                                  isClearable
-                                />
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={fVal ?? ""}
-                                  onChange={(e) =>
-                                    handleColumnFilterChange(
-                                      c.id,
-                                      e.target.value,
-                                    )
-                                  }
-                                  className="w-full rounded border px-2 py-1 text-sm"
-                                  placeholder={`Filter ${c.label || ""}`}
-                                />
-                              )}
-                            </>
-                          )}
-                        </th>
-                      );
-                    })}
-                  </tr>
-                </thead>
-                <tbody>
-                  {virtualize && (
-                    <tr>
-                      <td
-                        colSpan={visibleCols.length}
-                        style={{ height: virt.padTop }}
-                      />
-                    </tr>
-                  )}
-
-                  {renderRows.map((r, rowIdx) => (
-                    <tr
-                      key={r.id}
-                      className={clsx(
-                        "text-sm",
-                        rowIdx % 2 ? "bg-gray-50" : undefined,
-                      )}
-                    >
-                      {visibleCols.map((c) => {
-                        const value = r[c.id] ?? "";
-                        const colorConfig = getCellColorConfig(c.id, value);
-
-                        return (
-                          <td
-                            key={c.id}
-                            className={clsx(
-                              "px-3 py-2",
-                              c.pin === "left" &&
-                                "sticky left-0 z-[5] bg-white shadow-[2px_0_0_#e5e7eb]",
-                              c.pin === "right" &&
-                                "sticky right-0 z-[5] bg-white shadow-[-2px_0_0_#e5e7eb]",
-                            )}
-                            style={{
-                              width: c.width,
-                              minWidth: c.width,
-                              textAlign: colorConfig ? "center" : "left",
-                              verticalAlign: "middle",
-                            }}
-                          >
-                            {renderCell(c, r)}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-
-                  {virtualize && (
-                    <tr>
-                      <td
-                        colSpan={visibleCols.length}
-                        style={{ height: virt.padBottom }}
-                      />
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-
-              {snapX != null && tableWrapRef.current && (
-                <div
-                  className="pointer-events-none absolute top-0 bottom-0 w-px bg-indigo-500/60"
-                  style={{
-                    left:
-                      snapX -
-                      (tableWrapRef.current?.getBoundingClientRect().left ||
-                        0) +
-                      "px",
-                  }}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Pagination */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="rounded-md border px-2 py-1 text-sm"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={pageSafe === 1}
-              >
-                Prev
-              </button>
-              <div className="text-sm">
-                Page {pageSafe} / {totalPages}
-              </div>
-              <button
-                type="button"
-                className="rounded-md border px-2 py-1 text-sm"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={pageSafe === totalPages}
-              >
-                Next
-              </button>
-              {/* Virtualize / Show all toggle button */}
-              <button
-                type="button"
-                className={
-                  "ml-2 rounded-md border px-2 py-1 text-sm " +
-                  (virtualize ? "bg-indigo-600 text-white" : "bg-white")
-                }
-                onClick={handleVirtualizeToggle}
-                title={
-                  virtualize
-                    ? "Showing all rows (click to paginate)"
-                    : "Show all rows"
-                }
-              >
-                {virtualize ? "Showing all" : "Show all"}
-              </button>
-              <select
-                value={pageSize}
-                onChange={(e) => setPageSize(Number((e.target as any).value))}
-                className="ml-2 h-9 rounded-md border bg-white px-2 text-sm"
-              >
-                <option value={10}>10</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 text-sm">
-              <span className="rounded bg-gray-100 px-2 py-1">
-                {Object.values(selected).filter(Boolean).length} selected
-              </span>
-            </div>
-          </div>
-
-          {/* Footer stats */}
-          {tableFooter && tableFooter?.length > 0 && (
-            <div className="flex justify-end gap-8 mt-3">
-              {tableFooter?.map((footer: any) => (
-                <div key={footer.Keyname}>
-                  <span
-                    style={{
-                      fontWeight: "bold",
-                      fontSize: "14px",
-                      color: "black",
-                    }}
-                  >
-                    {footer.Keyname}
-                  </span>
-                  :
-                  <span style={{ fontSize: "14px", color: "black" }}>
-                    {footer.KeyValue}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="sticky bottom-2 mt-4 inline-flex items-center gap-3 rounded-xl border bg-white px-3 py-2 text-sm shadow">
-            <div>
-              <b>{sortedRows.length}</b> rows
-            </div>
-            <div className="hidden sm:block">
-              Virtualized: <b>{String(virtualize)}</b>
-            </div>
-          </div>
-        </div>
-      </CardBody>
 
       {/* Column visibility popover */}
       <Popover
@@ -5800,7 +5723,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }}
       >
         <Box sx={{ p: 2 }}>
-          {/* Header */}
           <Box
             sx={{
               width: "100%",
@@ -5822,7 +5744,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </Button>
           </Box>
 
-          {/* Content */}
           {replaceButtonData && (
             <div style={{ height: "calc(100% - 60px)" }}>
               <AutoCallPage

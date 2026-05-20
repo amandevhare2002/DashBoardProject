@@ -76,7 +76,7 @@ export const ButtonField = ({
   isMobile,
   onClick,
 }: any) => {
-  console.log("fieldfieldfieldfield", field.FieldName);
+  console.log("fieldfieldfieldfield", field.ValueType);
   const [isButtonLoading, setIsButtonLoading] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isEditorDrawerOpen, setIsEditorDrawerOpen] = useState(false);
@@ -1325,6 +1325,8 @@ export const ButtonField = ({
                       isFreezeHeader: result.data.IsFreezeHeader || null,
                       popupdrawersettings:
                         result.data.Popupdrawersettings || null,
+                      isOpenonTables: result.data.IsOpenonTables || false,
+                      isOpenwithTabs: result.data.IsOpenwithTabs || false,
                     });
                     const saveIsCheckBoxReq = sessionStorage.setItem(
                       "isCheckBoxReq",
@@ -1429,6 +1431,9 @@ export const ButtonField = ({
                           });
                         }
                       });
+                      setUpdatedPersonalDetails(
+                        JSON.parse(JSON.stringify(newUpdatedDetails)),
+                      );
                       setSaveData(updatedSaveData);
                     }
                     if (result.data.ChartData && result.data.Chartids) {
