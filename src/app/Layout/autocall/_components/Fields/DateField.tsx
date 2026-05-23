@@ -126,34 +126,16 @@ export function DateField({
 
   // Initialize date range from searchValues if in search mode
   useEffect(() => {
-    if (
-      isSearch &&
-      field?.FieldName &&
-      searchValues &&
-      searchValues[field.FieldName]
-    ) {
-      const fieldValue = searchValues[field.FieldName];
-
-      // Handle both array format (from handleDateRangeChange) and string format (from onChange prop)
-      if (Array.isArray(fieldValue) && fieldValue.length >= 2) {
-        // Array format: [{ Value: "YYYY-MM-DD" }, { Value: "YYYY-MM-DD" }]
+    if (isSearch && field?.IsDateRange && searchValues[field.FieldName]) {
+      const values = searchValues[field.FieldName];
+      if (Array.isArray(values) && values.length >= 2) {
         setDateRange([
-          fieldValue[0]?.Value ? new Date(fieldValue[0].Value) : null,
-          fieldValue[1]?.Value ? new Date(fieldValue[1].Value) : null,
+          values[0]?.Value ? new Date(values[0].Value) : null,
+          values[1]?.Value ? new Date(values[1].Value) : null,
         ]);
-      } else if (typeof fieldValue === "string" && fieldValue.includes("|")) {
-        // String format from onChange: "YYYY-MM-DD|YYYY-MM-DD"
-        const [startStr, endStr] = fieldValue.split("|");
-        setDateRange([
-          startStr ? new Date(startStr) : null,
-          endStr ? new Date(endStr) : null,
-        ]);
-      } else if (typeof fieldValue === "string" && fieldValue) {
-        // Single date string
-        setDateRange([new Date(fieldValue), null]);
       }
     }
-  }, [isSearch, field?.FieldName, searchValues]);
+  }, [isSearch, field, searchValues]);
 
   // Validate date against regex
   const validateDate = (dateString: string) => {
@@ -238,11 +220,7 @@ export function DateField({
   const handleDateRangeChange = (dates: [Date | null, Date | null]) => {
     setDateRange(dates);
 
-    // Call parent's onChange callback if provided (from search area)
-    if (onChange && typeof onChange === "function") {
-      onChange(dates);
-    } else if (isSearch && field?.FieldName) {
-      // Only update searchValues directly if onChange callback is not provided
+    if (isSearch && field?.FieldName) {
       const formattedDates = dates.map((date) => {
         if (date) {
           const formattedDate = moment(date).format("YYYY-MM-DD");

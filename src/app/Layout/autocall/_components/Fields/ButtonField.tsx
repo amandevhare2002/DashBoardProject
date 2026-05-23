@@ -75,6 +75,8 @@ export const ButtonField = ({
   information,
   isMobile,
   onClick,
+  setApiURL,
+  apiURL,
 }: any) => {
   console.log("fieldfieldfieldfield", field.ValueType);
   const [isButtonLoading, setIsButtonLoading] = useState(false);
@@ -1297,6 +1299,7 @@ export const ButtonField = ({
                       setLoading(false);
                       return;
                     }
+                    setApiURL(result.data.APIURL);
                     // Update table metadata
                     setTableMetadata({
                       isDetailPopupOpen: result.data.IsDetailPopupOpen || false,
@@ -1324,7 +1327,7 @@ export const ButtonField = ({
                       chartIds: result.data.Chartids || null,
                       isFreezeHeader: result.data.IsFreezeHeader || null,
                       popupdrawersettings:
-                        result.data.Popupdrawersettings || null,
+                        result.data.popupdrawersettings || null,
                       isOpenonTables: result.data.IsOpenonTables || false,
                       isOpenwithTabs: result.data.IsOpenwithTabs || false,
                     });
@@ -1614,6 +1617,7 @@ export const ButtonField = ({
                       });
                     });
                   }
+                  setApiURL(result.data.APIURL);
                   downloadBase64File(
                     result.data.Base64string,
                     result.data.Filename,

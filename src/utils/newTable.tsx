@@ -219,6 +219,8 @@ interface NewTableProps {
   onTabsCleared?: () => void; // Callback for clearing all tabs
   externalTabs?: TableTab[]; // Tabs managed by parent
   externalSelectedTabId?: string | null;
+  setApiURL?: string;
+  apiURL?: string;
 }
 
 interface LinkModalData {
@@ -310,10 +312,10 @@ const NewTablePage: React.FC<NewTableProps> = ({
   onTabsCleared,
   externalTabs = [],
   externalSelectedTabId = null,
+  setApiURL,
+  apiURL,
 }) => {
-  console.log("🚀 NewTablePage Props:", {
-    externalTabs,
-  });
+  console.log("apiURLapiURLapiURLapiURL", popupdrawersettings);
   const tableInstanceKey = useMemo(() => {
     return `table_${moduleID}_${fieldID}_${field?.FieldID}_${JSON.stringify(
       columns?.map((c) => c.name),
@@ -2177,6 +2179,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
           setUploadedFiles(result.data.files || uploadedFiles);
         }
       }
+      setApiURL(result?.data?.APIURL);
     } catch (error: any) {
       console.error("API Error:", error);
       toast.error(
@@ -3677,13 +3680,13 @@ const NewTablePage: React.FC<NewTableProps> = ({
         } else if (handleTableLinkClick) {
           handleTableLinkClick(
             value,
-            row?.ModuleID || moduleID || "",
+            row?.Moduleid || row?.ModuleID || moduleID || "",
             defaultVisible,
           );
         } else {
           addTableTab(
             value,
-            row?.ModuleID || moduleID || "",
+            row?.Moduleid || row?.ModuleID || moduleID || "",
             defaultVisible,
             row,
             `${columnConfig?.label || col.label || "Record"}: ${value}`,
