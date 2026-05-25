@@ -1324,7 +1324,7 @@ export const ButtonField = ({
                       chartIds: result.data.Chartids || null,
                       isFreezeHeader: result.data.IsFreezeHeader || null,
                       popupdrawersettings:
-                        result.data.Popupdrawersettings || null,
+                        result.data.popupdrawersettings || null,
                       isOpenonTables: result.data.IsOpenonTables || false,
                       isOpenwithTabs: result.data.IsOpenwithTabs || false,
                     });
