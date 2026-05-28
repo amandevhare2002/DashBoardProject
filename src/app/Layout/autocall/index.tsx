@@ -77,6 +77,7 @@ import NewTablePage from "@/utils/newTable";
 import SearchDropArea from "./_components/SearchBoxContainer";
 import { CSSProperties } from "styled-components";
 import { OuterAdvancedTabs } from "./_components/AdvancedOutertabs";
+import StableAccordionEnterprise from "@/utils/Accordion";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -3195,6 +3196,7 @@ const AutoCallPage = ({
                   </Modal>
 
                   <CustomTabPanel value={value} index={4}>
+                    {/* <StableAccordionEnterprise /> */}
                     <Button onClick={() => setIsCardView(!isCardView)}>
                       Is Card View
                     </Button>
@@ -3286,6 +3288,7 @@ const AutoCallPage = ({
                                     information={information}
                                     isDrag={isSearchDrag}
                                     onResize={handleSearchFieldResize}
+                                    setSaveData={setSearchValues}
                                   />
                                 );
                               case "DATE":
