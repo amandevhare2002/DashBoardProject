@@ -75,6 +75,8 @@ export const ButtonField = ({
   information,
   isMobile,
   onClick,
+  setApiURL,
+  apiURL,
 }: any) => {
   console.log("fieldfieldfieldfield", field.ValueType);
   const [isButtonLoading, setIsButtonLoading] = useState(false);
@@ -1273,30 +1275,6 @@ export const ButtonField = ({
                     };
                     sessionStorage.setItem("buttonID", field.FieldID);
                     const result = await postToMultipleAPIs(field.APIURL, data);
-                    if (!result.data.Table || result.data.Table.length === 0) {
-                      const fieldID = result.data.FieldID;
-                      const newUpdatedDetails = [...updatedPersonalDetails];
-                      newUpdatedDetails.forEach((tab) => {
-                        if (tab?.Values && Array.isArray(tab.Values)) {
-                          tab.Values.forEach((fieldItem: any) => {
-                            if (fieldItem?.FieldID == fieldID) {
-                              fieldItem.buttonFields = [];
-                              fieldItem.tableColumns = [];
-                              fieldItem.tableFooter = [];
-                            }
-                          });
-                        }
-                      });
-                      setUpdatedPersonalDetails(
-                        JSON.parse(JSON.stringify(newUpdatedDetails)),
-                      );
-                      downloadBase64File(
-                        result.data.Base64string,
-                        result.data.Filename,
-                      );
-                      setLoading(false);
-                      return;
-                    }
                     // Update table metadata
                     setTableMetadata({
                       isDetailPopupOpen: result.data.IsDetailPopupOpen || false,
@@ -1469,6 +1447,31 @@ export const ButtonField = ({
 
                       setUpdatedPersonalDetails(newUpdatedDetails);
                     }
+                    if (!result.data.Table || result.data.Table.length === 0) {
+                      const fieldID = result.data.FieldID;
+                      const newUpdatedDetails = [...updatedPersonalDetails];
+                      newUpdatedDetails.forEach((tab) => {
+                        if (tab?.Values && Array.isArray(tab.Values)) {
+                          tab.Values.forEach((fieldItem: any) => {
+                            if (fieldItem?.FieldID == fieldID) {
+                              fieldItem.buttonFields = [];
+                              fieldItem.tableColumns = [];
+                              fieldItem.tableFooter = [];
+                            }
+                          });
+                        }
+                      });
+                      setUpdatedPersonalDetails(
+                        JSON.parse(JSON.stringify(newUpdatedDetails)),
+                      );
+                      downloadBase64File(
+                        result.data.Base64string,
+                        result.data.Filename,
+                      );
+                      setLoading(false);
+                      return;
+                    }
+                    setApiURL(result.data.APIURL);
                   } catch (error: any) {
                     // ✅ On API failure (500 etc.), reset buttonFields for this field only
                     const newUpdatedDetails = [...updatedPersonalDetails];
@@ -1614,6 +1617,7 @@ export const ButtonField = ({
                       });
                     });
                   }
+                  setApiURL(result.data.APIURL);
                   downloadBase64File(
                     result.data.Base64string,
                     result.data.Filename,

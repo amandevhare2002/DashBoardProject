@@ -144,6 +144,8 @@ interface TableTab {
   moduleID: string;
   defaultVisible?: any;
   rowData?: any;
+  isApiResponse?: boolean; // New property
+  apiUrl?: string;
 }
 
 interface NewTableProps {
@@ -346,6 +348,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
       defaultVisible?: any,
       rowData?: any,
       tabName?: string,
+      openModal: boolean = true,
     ) => {
       const tabId = `${moduleID}_${recordID}`;
 
@@ -361,7 +364,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
         } else if (!isExternallyManaged) {
           setInternalSelectedTabId(tabId);
           // Only open modal internally if not externally managed
-          openModalForTab(existingTab);
+          if (openModal) {
+            openModalForTab(existingTab);
+          }
         }
         return;
       }
@@ -392,22 +397,41 @@ const NewTablePage: React.FC<NewTableProps> = ({
         // Internal management - handle modal here
         setInternalTabs((prev) => [...prev, newTab]);
         setInternalSelectedTabId(tabId);
-        openModalForTab(newTab);
+        if (openModal) {
+          openModalForTab(newTab);
+        }
       }
     },
     [externalTabs, tableTabs, onTabAdded, onTabSelected, isExternallyManaged],
   );
 
   // Function to open modal for a specific tab
-  const openModalForTab = useCallback((tab: TableTab) => {
-    setModalData({
-      app_id: tab.recordID,
-      ModuleID: tab.moduleID,
-      defaultVisible: tab.defaultVisible,
-      timelineData: tab.rowData?.timelineData,
-    });
-    setIsModalOpen(true);
-  }, []);
+  // Replace the existing openModalForTab function
+  const openModalForTab = useCallback(
+    (tab: TableTab) => {
+      // Check if we should use drawer instead of modal
+      if (popupdrawersettings?.IsSidedrawer && !popupdrawersettings?.IsPopup) {
+        setAutocallSideDrawerData({
+          recordID: tab.recordID,
+          ModuleID: tab.moduleID,
+          defaultVisible: tab.defaultVisible,
+          timelineData: tab.rowData?.timelineData,
+          tabName: tab.name,
+        });
+        setAutocallSideDrawerOpen(true);
+      } else {
+        // Default to modal for popup
+        setModalData({
+          app_id: tab.recordID,
+          ModuleID: tab.moduleID,
+          defaultVisible: tab.defaultVisible,
+          timelineData: tab.rowData?.timelineData,
+        });
+        setIsModalOpen(true);
+      }
+    },
+    [popupdrawersettings],
+  );
 
   // Function to close a specific tab
   const closeTableTab = useCallback(
@@ -460,10 +484,25 @@ const NewTablePage: React.FC<NewTableProps> = ({
         onTabSelected(tab.id);
       } else if (!isExternallyManaged) {
         setInternalSelectedTabId(tab.id);
-        openModalForTab(tab);
+        if (popupdrawersettings?.IsPopup) {
+          openModalForTab(tab); // Open modal
+        } else if (popupdrawersettings?.IsSidedrawer) {
+          // Open in side drawer
+          setAutocallSideDrawerData({
+            recordID: tab.recordID,
+            moduleID: tab.moduleID,
+            defaultVisible: tab.defaultVisible,
+            rowData: tab.rowData,
+            tabName: tab.name,
+          });
+          setAutocallSideDrawerOpen(true);
+        } else {
+          // Default fallback - open modal
+          openModalForTab(tab);
+        }
       }
     },
-    [onTabSelected, isExternallyManaged],
+    [onTabSelected, isExternallyManaged, popupdrawersettings, openModalForTab],
   );
 
   // ==================== EXISTING STATE ====================
@@ -582,6 +621,9 @@ const NewTablePage: React.FC<NewTableProps> = ({
 
   const [replaceDrawerOpen, setReplaceDrawerOpen] = useState(false);
   const [replaceButtonData, setReplaceButtonData] = useState<any>(null);
+  const [autocallSideDrawerOpen, setAutocallSideDrawerOpen] = useState(false);
+  const [autocallSideDrawerData, setAutocallSideDrawerData] =
+    useState<any>(null);
   const [buttonLoading, setButtonLoading] = useState(false);
 
   const [applyFirstCellMode, setApplyFirstCellMode] = useState<{
@@ -626,6 +668,150 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
     return [];
   });
+  // Add these state variables at the top of NewTablePage component
+  const [apiResponseTabs, setApiResponseTabs] = useState<{
+    [tabId: string]: {
+      data: any;
+      loading: boolean;
+      error: string | null;
+      tableData: any[];
+      columns: any[];
+      originalTableData: any[];
+      originalColumns: any[];
+      tabName: string;
+    };
+  }>({});
+
+  const [activeApiTab, setActiveApiTab] = useState<string | null>(null);
+  const [apiLinkLoading, setApiLinkLoading] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [isApiViewActive, setIsApiViewActive] = useState(false);
+  // const handleApiLinkClick = async (
+  //   row: any,
+  //   columnConfig: any,
+  //   value: any,
+  // ) => {
+  //   const apiUrl = apiURL; // Get API URL from column config
+  //   if (!apiUrl) {
+  //     console.error("No API URL configured for this column");
+  //     toast.error("No API URL configured", { style: { top: 80 } });
+  //     return;
+  //   }
+
+  //   const tabId = `api_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  //   const tabName = `${columnConfig?.label || columnConfig?.name || "API"}: ${value || "Response"}`;
+
+  //   // Set loading state for this tab
+  //   setApiLinkResponseTabs((prev) => ({
+  //     ...prev,
+  //     [tabId]: { data: null, loading: true, error: null },
+  //   }));
+
+  //   // Add tab to the tabs system
+  //   if (onTabAdded) {
+  //     onTabAdded({
+  //       id: tabId,
+  //       name: tabName,
+  //       recordID: tabId,
+  //       moduleID: moduleID || menuID || "",
+  //       defaultVisible: null,
+  //       rowData: row,
+  //       isApiResponse: true,
+  //       apiUrl: apiUrl,
+  //     });
+  //     onTabSelected?.(tabId);
+  //   } else {
+  //     // Internal tab management
+  //     setInternalTabs((prev) => [
+  //       ...prev,
+  //       {
+  //         id: tabId,
+  //         name: tabName,
+  //         recordID: tabId,
+  //         moduleID: moduleID || menuID || "",
+  //         defaultVisible: null,
+  //         rowData: row,
+  //         isApiResponse: true,
+  //         apiUrl: apiUrl,
+  //       },
+  //     ]);
+  //     setInternalSelectedTabId(tabId);
+  //   }
+
+  //   try {
+  //     // Build the PostedJson payload from row data
+  //     const postedJson = buildPostedJsonFromRow(row, columnConfig);
+
+  //     const payload = {
+  //       Userid: localStorage.getItem("username"),
+  //       ModuleID: menuID || moduleID,
+  //       PostedJson: postedJson,
+  //       ButtonID: fieldID || columnConfig?.FieldID || 0,
+  //     };
+
+  //     const response = await axios.post(apiUrl, payload, {
+  //       headers: {
+  //         Authorization: `Bearer ${localStorage.getItem("token")}`,
+  //         "Content-Type": "application/json",
+  //       },
+  //     });
+
+  //     // Update the tab with response data
+  //     setApiLinkResponseTabs((prev) => ({
+  //       ...prev,
+  //       [tabId]: {
+  //         data: response.data,
+  //         loading: false,
+  //         error: null,
+  //       },
+  //     }));
+
+  //     toast.success("API call successful!", { style: { top: 80 } });
+  //   } catch (error: any) {
+  //     console.error("API call failed:", error);
+  //     setApiLinkResponseTabs((prev) => ({
+  //       ...prev,
+  //       [tabId]: {
+  //         data: null,
+  //         loading: false,
+  //         error:
+  //           error?.response?.data?.Message ||
+  //           error.message ||
+  //           "API call failed",
+  //       },
+  //     }));
+  //     toast.error("API call failed", { style: { top: 80 } });
+  //   }
+  // };
+
+  // // Helper function to build PostedJson from row data
+  // const buildPostedJsonFromRow = (row: any, columnConfig?: any) => {
+  //   const postedJson: any[] = [];
+
+  //   // Get all columns that should be included
+  //   const columnsToInclude =
+  //     columnConfig?.includeColumns ||
+  //     Object.keys(row).filter(
+  //       (key) =>
+  //         !key.startsWith("__") &&
+  //         key !== "id" &&
+  //         key !== "select" &&
+  //         key !== "actions",
+  //     );
+
+  //   columnsToInclude.forEach((colName: string) => {
+  //     const value = row[colName];
+  //     if (value !== undefined && value !== null && value !== "") {
+  //       postedJson.push({
+  //         FieldName: colName,
+  //         FieldValue: value.toString(),
+  //       });
+  //     }
+  //   });
+
+  //   return postedJson;
+  // };
 
   const loadSavedSelection = (): Record<string, boolean> => {
     try {
@@ -1286,7 +1472,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
             chartData: result.data.ChartData || null,
             chartIds: result.data.Chartids || null,
             isFreezeHeader: result.data.IsFreezeHeader || null,
-            popupdrawersettings: result.data.Popupdrawersettings || null,
+            popupdrawersettings: result.data.popupdrawersettings || null,
             isOpenonTables: result.data.IsOpenonTables || false,
             isOpenwithTabs: result.data.IsOpenwithTabs || false,
           });
@@ -3177,6 +3363,84 @@ const NewTablePage: React.FC<NewTableProps> = ({
     return null;
   };
 
+  // Replace the switchToApiTab function with this corrected version
+  const switchToApiTab = (tabId: string) => {
+    const tabData = apiResponseTabs[tabId];
+    if (!tabData) return;
+
+    setActiveApiTab(tabId);
+    setIsApiViewActive(true);
+
+    // Check if the API response had an error or no data
+    if (
+      tabData.error ||
+      (tabData.tableData && tabData.tableData.length === 0)
+    ) {
+      // Show empty state - clear the table
+      setRows([]);
+      setCols([]);
+    } else if (tabData.tableData && tabData.tableData.length > 0) {
+      // Show API response data
+      setRows(tabData.tableData);
+      if (tabData.columns.length > 0) {
+        setCols(tabData.columns);
+      }
+    } else {
+      // Default empty state
+      setRows([]);
+      setCols([]);
+    }
+  };
+
+  // Function to close an API tab
+  const closeApiTab = (tabId: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+
+    const tabData = apiResponseTabs[tabId];
+    const remainingTabs = Object.keys(apiResponseTabs).filter(
+      (id) => id !== tabId,
+    );
+
+    // Remove the tab
+    const newTabs = { ...apiResponseTabs };
+    delete newTabs[tabId];
+    setApiResponseTabs(newTabs);
+
+    if (remainingTabs.length > 0) {
+      // Switch to first remaining tab
+      const firstTabId = remainingTabs[0];
+      switchToApiTab(firstTabId);
+    } else {
+      // No more tabs, restore original data and exit API view
+      if (tabData && tabData.originalTableData) {
+        setRows(tabData.originalTableData);
+        if (tabData.originalColumns && tabData.originalColumns.length > 0) {
+          setCols(tabData.originalColumns);
+        }
+      }
+      setActiveApiTab(null);
+      setIsApiViewActive(false);
+    }
+  };
+
+  // Function to close all API tabs
+  const closeAllApiTabs = () => {
+    // Restore original data from first tab
+    const firstTab = Object.values(apiResponseTabs)[0];
+    if (firstTab && firstTab.originalTableData) {
+      setRows(firstTab.originalTableData);
+      if (firstTab.originalColumns && firstTab.originalColumns.length > 0) {
+        setCols(firstTab.originalColumns);
+      }
+    }
+
+    setApiResponseTabs({});
+    setActiveApiTab(null);
+    setIsApiViewActive(false);
+  };
+
   const ColoredBadge = ({
     color,
     children,
@@ -3660,33 +3924,237 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
 
     // ==================== UPDATED MAIN LINK HANDLER WITH TABS ====================
+    // In the link handler section
+    // In the link handler section
     if (
       (col.name === "app_id" || col.id === mainColValue || isMainCol) &&
       value
     ) {
-      const handleLinkClick = (e: React.MouseEvent) => {
+      const handleLinkClick = async (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
 
+        // PRIORITY 1: Check if apiURL prop is provided
+        if (apiURL && typeof apiURL === "string" && apiURL.trim() !== "") {
+          console.log("Calling API URL:", apiURL);
+          setApiLinkLoading((prev) => ({
+            ...prev,
+            [`${row.id}_${col.id}`]: true,
+          }));
+
+          // Create a unique tab ID
+          const tabId = `api_tab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const tabName = `${col.label || col.name || "Record"}: ${value}`;
+
+          // Store current table data as original
+          const currentTableData = [...rows];
+          const currentColumnsData = [...cols];
+
+          // Check if tab already exists for this record
+          const existingTabId = Object.keys(apiResponseTabs).find(
+            (id) => apiResponseTabs[id].tabName === tabName,
+          );
+
+          if (existingTabId) {
+            // Switch to existing tab
+            const existingTab = apiResponseTabs[existingTabId];
+            setActiveApiTab(existingTabId);
+            setIsApiViewActive(true);
+
+            // Replace table with existing tab data
+            if (existingTab.tableData && existingTab.tableData.length > 0) {
+              setRows(existingTab.tableData);
+              if (existingTab.columns.length > 0) {
+                setCols(existingTab.columns);
+              }
+            } else if (existingTab.error) {
+              setRows([]);
+            }
+
+            setApiLinkLoading((prev) => ({
+              ...prev,
+              [`${row.id}_${col.id}`]: false,
+            }));
+            return;
+          }
+
+          // Initialize tab with loading state
+          setApiResponseTabs((prev) => ({
+            ...prev,
+            [tabId]: {
+              data: null,
+              loading: true,
+              error: null,
+              tableData: [],
+              columns: [],
+              originalTableData: currentTableData,
+              originalColumns: currentColumnsData,
+              tabName: tabName,
+            },
+          }));
+
+          // Set as active tab and switch to API view
+          setActiveApiTab(tabId);
+          setIsApiViewActive(true);
+
+          // Clear current table and show loading
+          setRows([]);
+
+          try {
+            // Build PostedJson from row data
+            const postedJson = buildPostedJsonFromRow(row);
+
+            const payload = {
+              Userid: localStorage.getItem("username"),
+              ModuleID: menuID || moduleID,
+              PostedJson: postedJson,
+              ButtonID: fieldID || 0,
+            };
+
+            console.log("API Payload:", payload);
+
+            const response = await axios.post(apiURL, payload, {
+              headers: {
+                Authorization: `Bearer ${localStorage.getItem("token")}`,
+                "Content-Type": "application/json",
+              },
+            });
+
+            console.log("API Response:", response.data);
+
+            // Process the response and extract table data
+            const { tableData, columns, hasError, errorMessage } =
+              processApiResponse(response.data);
+
+            if (hasError) {
+              // Show error in table
+              setRows([]); // Clear all rows
+              setCols([]);
+              setApiResponseTabs((prev) => ({
+                ...prev,
+                [tabId]: {
+                  ...prev[tabId],
+                  data: response.data,
+                  loading: false,
+                  error: errorMessage,
+                  tableData: [],
+                  columns: [],
+                },
+              }));
+
+              setRows([]);
+              toast.error(errorMessage, { style: { top: 80 } });
+            } else if (tableData && tableData.length > 0) {
+              // Replace the current table with API response data
+              setRows(tableData);
+              if (columns.length > 0) {
+                setCols(columns);
+              }
+
+              // Update tab with success data
+              setApiResponseTabs((prev) => ({
+                ...prev,
+                [tabId]: {
+                  ...prev[tabId],
+                  data: response.data,
+                  loading: false,
+                  error: null,
+                  tableData: tableData,
+                  columns: columns,
+                },
+              }));
+
+              toast.success(`Loaded ${tableData.length} record(s)`, {
+                style: { top: 80 },
+              });
+            } else {
+              // No table data in response
+              setApiResponseTabs((prev) => ({
+                ...prev,
+                [tabId]: {
+                  ...prev[tabId],
+                  data: response.data,
+                  loading: false,
+                  error: "No table data found in API response",
+                  tableData: [],
+                  columns: [],
+                },
+              }));
+
+              setRows([]);
+              toast.warning("API response contains no table data", {
+                style: { top: 80 },
+              });
+            }
+          } catch (error: any) {
+            console.error("API call failed:", error);
+            setApiResponseTabs((prev) => ({
+              ...prev,
+              [tabId]: {
+                ...prev[tabId],
+                data: null,
+                loading: false,
+                error:
+                  error?.response?.data?.Message ||
+                  error.message ||
+                  "API call failed",
+                tableData: [],
+                columns: [],
+              },
+            }));
+
+            setRows([]);
+            toast.error("API call failed", { style: { top: 80 } });
+          } finally {
+            setApiLinkLoading((prev) => ({
+              ...prev,
+              [`${row.id}_${col.id}`]: false,
+            }));
+          }
+          return; // IMPORTANT: Stop here, don't proceed to AutoCall
+        }
+
+        const moduleKey = Object.keys(row || {}).find(
+          (k) => k.toLowerCase() === "moduleid",
+        );
+
+        const rowModuleId = moduleKey
+          ? row?.[moduleKey as keyof typeof row]
+          : moduleID || "";
+
+        // PRIORITY 2: If no apiURL, proceed with AutoCall behavior
         if (popupdrawersettings?.IsPopup) {
-          // Add to table tabs instead of directly opening modal
           addTableTab(
             value,
-            row?.Moduleid || row?.ModuleID || moduleID || "",
+            rowModuleId,
             defaultVisible,
             row,
             `${columnConfig?.label || col.label || "Record"}: ${value}`,
           );
-        } else if (handleTableLinkClick) {
-          handleTableLinkClick(
+        } else if (popupdrawersettings?.IsSidedrawer) {
+          // Open in side drawer and still create the table tab
+          addTableTab(
             value,
-            row?.Moduleid || row?.ModuleID || moduleID || "",
+            rowModuleId,
             defaultVisible,
+            row,
+            `${columnConfig?.label || col.label || "Record"}: ${value}`,
+            false,
           );
+          setAutocallSideDrawerData({
+            recordID: value,
+            moduleID: rowModuleId,
+            defaultVisible: defaultVisible,
+            rowData: row,
+            tabName: `${columnConfig?.label || col.label || "Record"}: ${value}`,
+          });
+          setAutocallSideDrawerOpen(true);
+        } else if (handleTableLinkClick) {
+          handleTableLinkClick(value, rowModuleId, defaultVisible);
         } else {
           addTableTab(
             value,
-            row?.Moduleid || row?.ModuleID || moduleID || "",
+            rowModuleId,
             defaultVisible,
             row,
             `${columnConfig?.label || col.label || "Record"}: ${value}`,
@@ -3694,6 +4162,161 @@ const NewTablePage: React.FC<NewTableProps> = ({
         }
       };
 
+      // Helper function to process API response
+      const processApiResponse = (responseData: any) => {
+        let tableData: any[] = [];
+        let columns: any[] = [];
+        let hasError = false;
+        let errorMessage = "";
+        console.log("Processing API response data:NEWTABLE", responseData);
+        // Check for error in response
+        if (
+          responseData.remarks === "Fail" ||
+          responseData.Message === "Error"
+        ) {
+          hasError = true;
+          errorMessage = responseData.Message || "API returned an error";
+          return { tableData, columns, hasError, errorMessage };
+        }
+
+        // Check if Table is null or undefined
+        const hasTableData =
+          responseData.Table !== null &&
+          responseData.Table !== undefined &&
+          Array.isArray(responseData.Table);
+
+        // Also check for TableWidth array (could define columns even if Table is empty)
+        const hasTableWidth =
+          responseData.TableWidth &&
+          Array.isArray(responseData.TableWidth) &&
+          responseData.TableWidth.length > 0;
+
+        if (hasTableData && responseData.Table.length > 0) {
+          // Extract table data from response
+          tableData = responseData.Table;
+
+          // Generate columns from table data
+          const firstRow = tableData[0];
+          columns = Object.keys(firstRow)
+            .filter(
+              (key) =>
+                !key.startsWith("__") && key !== "id" && key !== "select",
+            )
+            .map((key) => ({
+              id: key,
+              name: key,
+              label: key
+                .replace(/_/g, " ")
+                .replace(/([A-Z])/g, " $1")
+                .trim(),
+              selector: (row: any) => row[key],
+              sortable: true,
+              wrap: true,
+            }));
+
+          // Add unique IDs to rows
+          tableData = tableData.map((row, index) => ({
+            ...row,
+            id: row.id || row.ID || `api_row_${Date.now()}_${index}`,
+          }));
+        } else if (hasTableWidth) {
+          // If Table is empty/null but TableWidth exists, create empty table with correct columns
+          console.log(
+            "Table is empty/null but TableWidth exists, creating empty table structure",
+          );
+
+          // Create columns from TableWidth
+          columns = responseData.TableWidth.map((col: any, index: number) => ({
+            id: col.Colname || col.columnName || `col_${index}`,
+            name: col.Colname || col.columnName || `col_${index}`,
+            label:
+              col.Fieldname ||
+              col.Colname ||
+              col.columnName ||
+              `Column ${index + 1}`,
+            selector: (row: any) => row[col.Colname || col.columnName] || "",
+            sortable: true,
+            wrap: true,
+          }));
+
+          // Empty table data
+          tableData = [];
+
+          // Add a message that no data is available
+          hasError = true;
+          errorMessage = "No data available from API";
+        } else {
+          // No table data and no table width - completely empty
+          hasError = true;
+          errorMessage = "No data returned from API";
+          columns = [];
+          tableData = [];
+        }
+
+        return { tableData, columns, hasError, errorMessage };
+      };
+
+      // Helper function to restore original data
+      const restoreOriginalData = (tabId?: string) => {
+        if (tabId && apiResponseTabs[tabId]) {
+          // Restore specific tab's original data
+          const tabData = apiResponseTabs[tabId];
+          if (
+            tabData.originalTableData &&
+            tabData.originalTableData.length > 0
+          ) {
+            setRows(tabData.originalTableData);
+            if (tabData.originalColumns && tabData.originalColumns.length > 0) {
+              setCols(tabData.originalColumns);
+            }
+          }
+        } else {
+          // Find the first tab's original data or clear
+          const firstTab = Object.values(apiResponseTabs)[0];
+          if (
+            firstTab &&
+            firstTab.originalTableData &&
+            firstTab.originalTableData.length > 0
+          ) {
+            setRows(firstTab.originalTableData);
+            if (
+              firstTab.originalColumns &&
+              firstTab.originalColumns.length > 0
+            ) {
+              setCols(firstTab.originalColumns);
+            }
+          }
+        }
+      };
+
+      // Helper function to build PostedJson from row data
+      const buildPostedJsonFromRow = (row: any) => {
+        const postedJson: any[] = [];
+
+        // Get all relevant fields from the row
+        Object.keys(row).forEach((key) => {
+          if (
+            !key.startsWith("__") &&
+            key !== "id" &&
+            key !== "select" &&
+            key !== "actions"
+          ) {
+            const value = row[key];
+            if (value !== undefined && value !== null && value !== "") {
+              postedJson.push({
+                FieldName: key,
+                FieldValue: value.toString(),
+              });
+            }
+          }
+        });
+
+        return postedJson;
+      };
+
+      const isLoading = apiLinkLoading[`${row.id}_${col.id}`];
+
+      // Render the link
       if (colorConfig) {
         return (
           <a
@@ -3703,7 +4326,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
             style={{ textDecoration: "none" }}
           >
             <ColoredBadge color={colorConfig.Color}>
-              {value || "-"}
+              {isLoading ? <CircularProgress size={16} /> : value || "-"}
             </ColoredBadge>
           </a>
         );
@@ -3720,7 +4343,7 @@ const NewTablePage: React.FC<NewTableProps> = ({
           onClick={handleLinkClick}
           onMouseDown={(e) => e.stopPropagation()}
         >
-          {value || "-"}
+          {isLoading ? <CircularProgress size={16} /> : value || "-"}
         </a>
       );
     }
@@ -3790,6 +4413,93 @@ const NewTablePage: React.FC<NewTableProps> = ({
     }
     return displayValue || "-";
   });
+
+  // Add this component inside NewTablePage to render API response content
+  const renderApiResponseContent = (
+    tabId: string,
+    responseData: any,
+    isLoading: boolean,
+    error: string | null,
+  ) => {
+    if (isLoading) {
+      return (
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "200px",
+          }}
+        >
+          <CircularProgress />
+          <span style={{ marginLeft: "10px" }}>Loading API response...</span>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div
+          style={{
+            padding: "20px",
+            color: "red",
+            backgroundColor: "#fee",
+            borderRadius: "4px",
+          }}
+        >
+          <h4>Error</h4>
+          <p>{error}</p>
+        </div>
+      );
+    }
+
+    if (!responseData) {
+      return <div>No data available</div>;
+    }
+
+    // Handle different response formats
+    const displayData = responseData.Table || responseData.Data || responseData;
+
+    if (Array.isArray(displayData) && displayData.length > 0) {
+      // If response is an array, display as table
+      const responseColumns = Object.keys(displayData[0]).map((key) => ({
+        name: key,
+        selector: (row: any) => row[key],
+        sortable: true,
+      }));
+
+      return (
+        <div style={{ padding: "10px" }}>
+          <NewTablePage
+            TableArray={displayData}
+            columns={responseColumns}
+            title="API Response"
+            menuID={menuID}
+            moduleID={moduleID}
+          />
+        </div>
+      );
+    } else if (displayData && typeof displayData === "object") {
+      // If response is an object, display as JSON
+      return (
+        <div style={{ padding: "10px" }}>
+          <pre
+            style={{
+              backgroundColor: "#f5f5f5",
+              padding: "15px",
+              borderRadius: "4px",
+              overflow: "auto",
+              maxHeight: "500px",
+            }}
+          >
+            {JSON.stringify(displayData, null, 2)}
+          </pre>
+        </div>
+      );
+    }
+
+    return <div>{String(displayData)}</div>;
+  };
 
   const memoizedRenderCell = useCallback(
     (col: any, row: any) => {
@@ -4953,6 +5663,11 @@ const NewTablePage: React.FC<NewTableProps> = ({
     setReplaceButtonData(null);
   };
 
+  const handleCloseAutoCallSideDrawer = () => {
+    setAutocallSideDrawerOpen(false);
+    setAutocallSideDrawerData(null);
+  };
+
   const collectSelectedTableData = () => {
     // Helper function to collect selected table data if needed
     if (selectedRows.length > 0) {
@@ -5036,78 +5751,75 @@ const NewTablePage: React.FC<NewTableProps> = ({
                   📑 Open Entries ({tableTabs.length}):
                 </span>
                 <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                  {tableTabs.map((tab) => (
-                    <div
-                      key={tab.id}
-                      onClick={() => handleTableTabClick(tab)}
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        padding: "4px 8px 4px 12px",
-                        backgroundColor:
-                          selectedTableTabId === tab.id ? "#007bff" : "#e9ecef",
-                        color:
-                          selectedTableTabId === tab.id ? "#fff" : "#495057",
-                        borderRadius: "6px",
-                        cursor: "pointer",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        transition: "all 0.2s ease",
-                        border:
-                          selectedTableTabId === tab.id
-                            ? "none"
-                            : "1px solid #dee2e6",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (selectedTableTabId !== tab.id) {
-                          e.currentTarget.style.backgroundColor = "#dee2e6";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        if (selectedTableTabId !== tab.id) {
-                          e.currentTarget.style.backgroundColor = "#e9ecef";
-                        }
-                      }}
-                    >
-                      <span
+                  {tableTabs.map((tab) => {
+                    const isApiResponse = tab.isApiResponse;
+                    const apiData = isApiResponse
+                      ? apiLinkResponseTabs[tab.id]
+                      : null;
+                    const isLoading = apiData?.loading || false;
+
+                    return (
+                      <div
+                        key={tab.id}
+                        onClick={() => handleTableTabClick(tab)}
                         style={{
-                          maxWidth: "200px",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {tab.name}
-                      </span>
-                      <button
-                        onClick={(e) => closeTableTab(tab.id, e)}
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "16px",
-                          fontWeight: "bold",
-                          color:
-                            selectedTableTabId === tab.id ? "#fff" : "#6c757d",
-                          padding: "0 2px",
-                          display: "flex",
+                          display: "inline-flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          marginLeft: "4px",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = "#dc3545";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color =
-                            selectedTableTabId === tab.id ? "#fff" : "#6c757d";
+                          gap: "6px",
+                          padding: "4px 8px 4px 12px",
+                          backgroundColor:
+                            selectedTableTabId === tab.id
+                              ? "#007bff"
+                              : "#e9ecef",
+                          color:
+                            selectedTableTabId === tab.id ? "#fff" : "#495057",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          transition: "all 0.2s ease",
+                          border:
+                            selectedTableTabId === tab.id
+                              ? "none"
+                              : "1px solid #dee2e6",
                         }}
                       >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                        {isLoading && (
+                          <CircularProgress
+                            size={12}
+                            style={{ marginRight: "4px" }}
+                          />
+                        )}
+                        <span
+                          style={{
+                            maxWidth: "200px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {tab.name}
+                        </span>
+                        <button
+                          onClick={(e) => closeTableTab(tab.id, e)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "16px",
+                            fontWeight: "bold",
+                            color:
+                              selectedTableTabId === tab.id
+                                ? "#fff"
+                                : "#6c757d",
+                            padding: "0 2px",
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -5136,7 +5848,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </div>
           </div>
         )}
-
         {/* Toolbar */}
         <div
           className="mb-3 flex flex-wrap items-center gap-2"
@@ -5266,7 +5977,158 @@ const NewTablePage: React.FC<NewTableProps> = ({
               .map(renderDynamicButton)}
           </div>
         </div>
+        {/* API Response Tabs Section */}
+        {/* API Response Tabs - Only shows when there are API tabs */}
+        {Object.keys(apiResponseTabs).length > 0 && (
+          <div
+            className="mb-3"
+            style={{
+              borderBottom: "1px solid #dee2e6",
+              backgroundColor: "#fff",
+              marginBottom: "16px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "8px 12px",
+                backgroundColor: "#f8f9fa",
+                borderRadius: "8px 8px 0 0",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "12px",
+                    color: "#6c757d",
+                    fontWeight: 500,
+                  }}
+                >
+                  📑 Open Tabs ({Object.keys(apiResponseTabs).length}):
+                </span>
+                <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                  {/* Original Table Tab */}
+                  <div
+                    onClick={() => {
+                      // Restore original table
+                      const firstTab = Object.values(apiResponseTabs)[0];
+                      if (firstTab && firstTab.originalTableData) {
+                        setRows(firstTab.originalTableData);
+                        if (
+                          firstTab.originalColumns &&
+                          firstTab.originalColumns.length > 0
+                        ) {
+                          setCols(firstTab.originalColumns);
+                        }
+                      }
+                      setActiveApiTab(null);
+                      setIsApiViewActive(false);
+                    }}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      padding: "4px 8px 4px 12px",
+                      backgroundColor: !isApiViewActive ? "#28a745" : "#e9ecef",
+                      color: !isApiViewActive ? "#fff" : "#495057",
+                      borderRadius: "6px",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      border: !isApiViewActive ? "none" : "1px solid #dee2e6",
+                    }}
+                  >
+                    📋 Main Table
+                  </div>
 
+                  {/* API Response Tabs */}
+                  {Object.entries(apiResponseTabs).map(([tabId, tabData]) => (
+                    <div
+                      key={tabId}
+                      onClick={() => {
+                        if (tabData.loading) return;
+                        switchToApiTab(tabId);
+                      }}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "4px 8px 4px 12px",
+                        backgroundColor:
+                          activeApiTab === tabId ? "#007bff" : "#e9ecef",
+                        color: activeApiTab === tabId ? "#fff" : "#495057",
+                        borderRadius: "6px",
+                        cursor: tabData.loading ? "not-allowed" : "pointer",
+                        fontSize: "12px",
+                        fontWeight: 500,
+                        opacity: tabData.loading ? 0.6 : 1,
+                        border:
+                          activeApiTab === tabId ? "none" : "1px solid #dee2e6",
+                      }}
+                    >
+                      {tabData.loading && (
+                        <CircularProgress
+                          size={12}
+                          style={{ marginRight: "4px" }}
+                        />
+                      )}
+                      {!tabData.loading && tabData.error && (
+                        <span style={{ color: "#dc3545" }}>⚠️</span>
+                      )}
+                      <span>
+                        {tabData.loading
+                          ? "Loading..."
+                          : tabData.error
+                            ? `Error`
+                            : `${tabData.tabName} (${tabData.tableData.length})`}
+                      </span>
+                      <button
+                        onClick={(e) => closeApiTab(tabId, e)}
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "16px",
+                          fontWeight: "bold",
+                          color: activeApiTab === tabId ? "#fff" : "#6c757d",
+                          padding: "0 2px",
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {Object.keys(apiResponseTabs).length > 0 && (
+                <button
+                  onClick={closeAllApiTabs}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#dc3545",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    padding: "4px 8px",
+                    borderRadius: "4px",
+                  }}
+                >
+                  Close All Tabs
+                </button>
+              )}
+            </div>
+          </div>
+        )}
         {/* Table */}
         <div
           ref={tableWrapRef}
@@ -5495,7 +6357,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             )}
           </div>
         </div>
-
         {/* Pagination */}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -5551,7 +6412,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </span>
           </div>
         </div>
-
         {/* Footer stats */}
         {tableFooter && tableFooter?.length > 0 && (
           <div className="flex justify-end gap-8 mt-3">
@@ -5574,7 +6434,6 @@ const NewTablePage: React.FC<NewTableProps> = ({
             ))}
           </div>
         )}
-
         <div className="sticky bottom-2 mt-4 inline-flex items-center gap-3 rounded-xl border bg-white px-3 py-2 text-sm shadow">
           <div>
             <b>{sortedRows.length}</b> rows
@@ -5617,13 +6476,24 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </Button>
           </div>
           <div>
-            <AutoCallPage
-              recordID={modalData?.app_id}
-              moduleID={modalData?.ModuleID}
-              isModalOpen={true}
-              defaultVisible={modalData?.defaultVisible}
-              timelineData={modalData?.timelineData}
-            />
+            {modalData?.isApiResponse ? (
+              // Render API response content
+              renderApiResponseContent(
+                modalData.app_id,
+                modalData.responseData,
+                modalData.isLoading,
+                modalData.error,
+              )
+            ) : (
+              // Render AutoCall component
+              <AutoCallPage
+                recordID={modalData?.app_id}
+                moduleID={modalData?.ModuleID}
+                isModalOpen={true}
+                defaultVisible={modalData?.defaultVisible}
+                timelineData={modalData?.timelineData}
+              />
+            )}
           </div>
         </ModalBody>
       </Modal>
@@ -5759,6 +6629,44 @@ const NewTablePage: React.FC<NewTableProps> = ({
             </div>
           )}
         </Box>
+      </Drawer>
+
+      {/* AutoCall Side Drawer - Opens when IsSidedrawer is true */}
+      <Drawer
+        anchor={popupdrawersettings?.Pos_Trans.toLowerCase()}
+        open={autocallSideDrawerOpen}
+        onClose={handleCloseAutoCallSideDrawer}
+        PaperProps={{
+          sx: {
+            width: `${popupdrawersettings?.popupwidth}%`,
+            height: `${popupdrawersettings?.popheight}%`,
+            boxShadow: "none",
+          },
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 5,
+            padding: "10px",
+          }}
+        >
+          <Button onClick={handleCloseAutoCallSideDrawer} className="b0">
+            Cancel
+          </Button>
+        </div>
+
+        {autocallSideDrawerData && (
+          <div style={{ height: "calc(100% - 60px)" }}>
+            <AutoCallPage
+              recordID={autocallSideDrawerData.recordID}
+              moduleID={autocallSideDrawerData.moduleID}
+              isModalOpen={autocallSideDrawerOpen}
+            />
+          </div>
+        )}
       </Drawer>
     </Card>
   );

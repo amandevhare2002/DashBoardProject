@@ -83,6 +83,8 @@ export function TableField({
   externalSelectedTabId,
   isOpenwithTabs,
   isOpenonTables,
+  setApiURL,
+  apiURL,
 }: any) {
   const [selectedRows, setSelectedRows] = useState<any[]>([]);
 
@@ -537,6 +539,7 @@ export function TableField({
                           },
                         );
                       }
+                      setApiURL(result.data.APIURL);
                     } catch (error: any) {
                       toast.error(
                         error?.response?.data?.Message || "An error occurred",
@@ -909,6 +912,8 @@ export function TableField({
                 externalTabs,
                 externalSelectedTabId,
               })}
+              setApiURL={setApiURL}
+              apiURL={apiURL}
             />
           </div>
         </BoxComponent>

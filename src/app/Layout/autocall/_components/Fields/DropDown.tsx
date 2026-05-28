@@ -38,6 +38,7 @@ export function DropDownField({
   setLoading,
   menuID,
   menuIDQuery,
+  setApiURL,
 }: any) {
   const [regexError, setRegexError] = useState<string | null>(null);
   const [localSelectedOption, setLocalSelectedOption] = useState<any>(null);
@@ -332,6 +333,7 @@ export function DropDownField({
           toast.success("Data updated successfully", { style: { top: 80 } });
         }
       }
+      setApiURL(result.data.APIURL);
     } catch (err: any) {
       console.error("Dropdown API error:", err);
       toast.error(

@@ -106,6 +106,8 @@ export const RenderFields = ({
   onTableTabsCleared,
   tableTabs,
   selectedTableTabId,
+  setApiURL,
+  apiURL,
 }: any) => {
   const [mobileLayout, setMobileLayout] = useState(isMobile);
   // Restore selected rows from localStorage on mount and when value (tab) changes
@@ -338,6 +340,8 @@ export const RenderFields = ({
                 setSaveData={setSaveData}
                 isdisable={isdisable}
                 isMobile={mobileLayout}
+                setApiURL={setApiURL}
+                apiURL={apiURL}
               />
             );
 
@@ -467,6 +471,8 @@ export const RenderFields = ({
                 information={information}
                 isMobile={mobileLayout}
                 isPdfPreviewOpen={isPDFPreviewOpen}
+                setApiURL={setApiURL}
+                apiURL={apiURL}
               />
             );
 
@@ -567,6 +573,8 @@ export const RenderFields = ({
                 onTabsCleared={onTableTabsCleared}
                 externalTabs={tableTabs}
                 externalSelectedTabId={selectedTableTabId}
+                setApiURL={setApiURL}
+                apiURL={apiURL}
               />
             ) : null;
 

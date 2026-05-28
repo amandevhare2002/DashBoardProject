@@ -210,21 +210,81 @@ const PersonalDetails = forwardRef(
     const [liftedSelectedTabId, setLiftedSelectedTabId] = useState<
       string | null
     >(null);
+    const [tableMetadata, setTableMetadata] = useState({
+      isDetailPopupOpen: false,
+      moduleID: null,
+      fieldID: null,
+      defaultVisible: false,
+      tablebuttons: [],
+      tableWidth: [],
+      ischeckBoxReq: false,
+      headerData: [],
+      footerData: [],
+      filename: null,
+      logo: {},
+      tableproperty: [],
+      outsideBorder: false,
+      insideBorder: false,
+      tableFormatting: [],
+      orientation: null,
+      headerRows: [],
+      footerRows: [],
+      tableheaderfooterCSS: null,
+      pageitemscnt: 0,
+      isPagination: false,
+      chartData: [],
+      chartIds: [],
+      chartType: "",
+      isFreezeHeader: false,
+      popupdrawersettings: {
+        IsPopup: true,
+        IsSidedrawer: false,
+        popheight: "",
+        popupwidth: "",
+        Pos_Trans: "",
+      },
+      isOpenwithTabs: false,
+      isOpenonTables: false,
+    });
 
     // Modal state for opened tabs (similar to existing modalData but for table tabs)
     const [tableTabModalOpen, setTableTabModalOpen] = useState(false);
     const [tableTabModalData, setTableTabModalData] = useState<any>(null);
+    const [tableTabDrawerOpen, setTableTabDrawerOpen] = useState(false);
+    console.log("~ PersonalDetails ~ tableMetadata:", tableMetadata);
 
     // Function to open modal for a specific tab
-    const openModalForTableTab = useCallback((tab: any) => {
-      setTableTabModalData({
-        app_id: tab.recordID,
-        ModuleID: tab.moduleID,
-        defaultVisible: tab.defaultVisible,
-        timelineData: tab.rowData?.timelineData,
-      });
-      setTableTabModalOpen(true);
-    }, []);
+    // Update the openModalForTableTab function in PersonalDetails.tsx
+    const openModalForTableTab = useCallback(
+      (tab: any) => {
+        // Check popupdrawersettings to determine modal vs drawer
+        if (
+          tableMetadata.popupdrawersettings?.IsSidedrawer &&
+          !tableMetadata.popupdrawersettings?.IsPopup
+        ) {
+          // Open in drawer
+          setTableTabModalData({
+            app_id: tab.recordID,
+            ModuleID: tab.moduleID,
+            defaultVisible: tab.defaultVisible,
+            timelineData: tab.rowData?.timelineData,
+          });
+          // setTableTabDrawerOpen(true);
+          setTableTabModalOpen(false);
+        } else {
+          // Open in modal
+          setTableTabModalData({
+            app_id: tab.recordID,
+            ModuleID: tab.moduleID,
+            defaultVisible: tab.defaultVisible,
+            timelineData: tab.rowData?.timelineData,
+          });
+          setTableTabModalOpen(true);
+          setTableTabDrawerOpen(false);
+        }
+      },
+      [tableMetadata.popupdrawersettings],
+    );
 
     const handleTableTabAdded = useCallback(
       (tab: any) => {
@@ -267,10 +327,35 @@ const PersonalDetails = forwardRef(
         setLiftedSelectedTabId(tabId);
         const selectedTab = liftedTableTabs.find((tab) => tab.id === tabId);
         if (selectedTab) {
-          openModalForTableTab(selectedTab);
+          // ✅ Check popupdrawersettings to determine modal vs drawer
+          if (
+            tableMetadata.popupdrawersettings?.IsSidedrawer &&
+            !tableMetadata.popupdrawersettings?.IsPopup
+          ) {
+            // Open in drawer
+            setTableTabModalData({
+              app_id: selectedTab.recordID,
+              ModuleID: selectedTab.moduleID,
+              defaultVisible: selectedTab.defaultVisible,
+              timelineData: selectedTab.rowData?.timelineData,
+            });
+            // You'll need a drawer state for these tabs
+            setTableTabModalOpen(false);
+            // Set drawer open state
+            setTableTabDrawerOpen(true); // Add this state
+          } else {
+            // Open in modal
+            setTableTabModalData({
+              app_id: selectedTab.recordID,
+              ModuleID: selectedTab.moduleID,
+              defaultVisible: selectedTab.defaultVisible,
+              timelineData: selectedTab.rowData?.timelineData,
+            });
+            setTableTabModalOpen(true);
+          }
         }
       },
-      [liftedTableTabs, openModalForTableTab],
+      [liftedTableTabs, tableMetadata.popupdrawersettings],
     );
 
     const handleTableTabsCleared = useCallback(() => {
@@ -505,42 +590,6 @@ const PersonalDetails = forwardRef(
     const [modalData, setModalData] = useState<any>();
     const [isEditNewField, setIsEditNewField] = useState<boolean>(false);
     const [editFieldData, setEditFieldData] = useState<any>(null);
-    const [tableMetadata, setTableMetadata] = useState({
-      isDetailPopupOpen: false,
-      moduleID: null,
-      fieldID: null,
-      defaultVisible: false,
-      tablebuttons: [],
-      tableWidth: [],
-      ischeckBoxReq: false,
-      headerData: [],
-      footerData: [],
-      filename: null,
-      logo: {},
-      tableproperty: [],
-      outsideBorder: false,
-      insideBorder: false,
-      tableFormatting: [],
-      orientation: null,
-      headerRows: [],
-      footerRows: [],
-      tableheaderfooterCSS: null,
-      pageitemscnt: 0,
-      isPagination: false,
-      chartData: [],
-      chartIds: [],
-      chartType: "",
-      isFreezeHeader: false,
-      popupdrawersettings: {
-        IsPopup: true,
-        IsSidedrawer: false,
-        popheight: "",
-        popupwidth: "",
-        Pos_Trans: "",
-      },
-      isOpenwithTabs: false,
-      isOpenonTables: false,
-    });
     const [isButtonLoading, setIsButtonLoading] = useState(false);
     const style = {
       backgroundColor: updatedPersonalDetails?.[value]?.Values?.[0]?.Bgcolor,
@@ -557,6 +606,8 @@ const PersonalDetails = forwardRef(
       string | null
     >(null);
     const [tabChangeAttempted, setTabChangeAttempted] = useState(false);
+    const [apiURL, setApiURL] = useState("");
+    console.log("~ PersonalDetails ~ apiURL:", apiURL);
 
     const validateCurrentTabMandatoryFields = () => {
       if (!updatedPersonalDetails[value]?.Values) {
@@ -4455,6 +4506,7 @@ const PersonalDetails = forwardRef(
             setUpdatedPersonalDetails(newUpdatedDetails);
           }
         }
+        setApiURL(result.data.APIURL);
         downloadBase64File(result.data.Base64string, result.data.Filename);
       } catch (error) {
         console.error("Error calling API on tab change:", error);
@@ -5442,6 +5494,8 @@ const PersonalDetails = forwardRef(
                                 onTableTabsCleared={handleTableTabsCleared}
                                 tableTabs={liftedTableTabs}
                                 selectedTableTabId={liftedSelectedTabId}
+                                setApiURL={setApiURL}
+                                apiURL={apiURL}
                               />
                             </div>
                             {updatedPersonalDetails[value]?.ds !== null && (
@@ -6218,6 +6272,8 @@ const PersonalDetails = forwardRef(
                         onTableTabsCleared={handleTableTabsCleared}
                         tableTabs={liftedTableTabs}
                         selectedTableTabId={liftedSelectedTabId}
+                        setApiURL={setApiURL}
+                        apiURL={apiURL}
                       />
                       {/* {uploadedFiles?.length > 0 && (
                       <Table bordered responsive>
@@ -6397,6 +6453,8 @@ const PersonalDetails = forwardRef(
                         onTableTabsCleared={handleTableTabsCleared}
                         tableTabs={liftedTableTabs}
                         selectedTableTabId={liftedSelectedTabId}
+                        setApiURL={setApiURL}
+                        apiURL={apiURL}
                       />
                     </div>
                   )}
@@ -6517,6 +6575,54 @@ const PersonalDetails = forwardRef(
             </div>
           </ModalBody>
         </Modal>
+        <Drawer
+          anchor={
+            tableMetadata.popupdrawersettings?.Pos_Trans?.toLowerCase() as
+              | "top"
+              | "left"
+              | "right"
+              | "bottom"
+          }
+          open={tableTabDrawerOpen}
+          onClose={() => {
+            setTableTabDrawerOpen(false);
+            setTableTabModalData(null);
+          }}
+          sx={{
+            "& .MuiDrawer-paper": {
+              width: `${tableMetadata.popupdrawersettings?.popupwidth || 80}%`,
+              height: `${tableMetadata.popupdrawersettings?.popheight || 90}vh`,
+            },
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: 5,
+              padding: "10px",
+            }}
+          >
+            <Button
+              className="b0"
+              onClick={() => {
+                setTableTabDrawerOpen(false);
+                setTableTabModalData(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+          <div>
+            <AutoCallPage
+              recordID={tableTabModalData?.app_id}
+              moduleID={tableTabModalData?.ModuleID}
+              isModalOpen={tableTabDrawerOpen}
+              defaultVisible={tableTabModalData?.defaultVisible}
+            />
+          </div>
+        </Drawer>
       </>
     );
   },
