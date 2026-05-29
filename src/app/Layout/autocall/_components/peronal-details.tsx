@@ -1933,47 +1933,151 @@ const PersonalDetails = forwardRef(
       return payload;
     }
 
-    const getDropdownValues = (updatedPersonalDetailsData: any) => {
+    const getDropdownValues = async (updatedPersonalDetailsData: any) => {
       const newDetails = [...updatedPersonalDetailsData];
-      let colData: any = [];
-      newDetails.map((res: any, index: any) => {
+
+      for (let index = 0; index < newDetails.length; index++) {
         if (index === value) {
-          res.Values.filter(async (response: any) => {
+          // Process each dropdown field sequentially to handle dependencies
+          for (const response of newDetails[index].Values) {
             if (response.FieldType === "DROPDOWN") {
               const dynamicPayload = buildDynamicPayload(response);
               if (!dynamicPayload.Colname) {
-                return;
+                continue;
               }
+
               const data = {
                 ...dynamicPayload,
                 Userid: localStorage.getItem("username"),
                 SearchText: searchLeadVal,
               };
 
-              const res: any = await axios.post(response.APIURL, data, {
-                headers: {
-                  Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-              });
-              if (res?.data?.colvalues) {
-                colData = [...res?.data?.colvalues];
-                const options = res.data.colvalues.map((value: any) => ({
-                  value: value.Colvalue,
-                  label: value.colvaluesAlias,
-                  fieldnamechange: value.fieldnamechange,
-                  visibilityfields: value.visibilityfields,
-                  TabVisibility: value.TabVisibility || [],
-                  OuterTabVisibility: value.OuterTabVisibility || [],
-                }));
-                response.DropdownArray = options;
-                response.childfields = res?.data?.childfields;
+              try {
+                const res: any = await axios.post(response.APIURL, data, {
+                  headers: {
+                    Authorization: `Bearer ${localStorage.getItem("token")}`,
+                  },
+                });
+
+                if (res?.data?.colvalues) {
+                  const options = res.data.colvalues.map((value: any) => ({
+                    value: value.Colvalue,
+                    label: value.colvaluesAlias,
+                    fieldnamechange: value.fieldnamechange,
+                    visibilityfields: value.visibilityfields,
+                    TabVisibility: value.TabVisibility || [],
+                    OuterTabVisibility: value.OuterTabVisibility || [],
+                  }));
+
+                  response.DropdownArray = options;
+                  response.childfields = res?.data?.childfields;
+
+                  // ✅ CRITICAL: Apply visibility based on the current selected value
+                  const currentSelectedValue = saveData[response.FieldName];
+
+                  if (currentSelectedValue) {
+                    // Find the selected option to get its visibility data
+                    const selectedOption = options.find(
+                      (opt: any) => opt.value === currentSelectedValue,
+                    );
+
+                    if (selectedOption) {
+                      // Apply visibility changes for fields
+                      if (
+                        selectedOption.visibilityfields &&
+                        selectedOption.visibilityfields.length > 0
+                      ) {
+                        selectedOption.visibilityfields.forEach(
+                          (visibilityField: any) => {
+                            // Find the field to update visibility
+                            newDetails.forEach((tab: any) => {
+                              tab.Values.forEach((field: any) => {
+                                if (
+                                  Number(field.FieldID) ===
+                                  Number(visibilityField.FieldID)
+                                ) {
+                                  field.DefaultVisible =
+                                    visibilityField.IsDisplay;
+                                }
+                              });
+                            });
+                          },
+                        );
+                      }
+
+                      // Apply TabVisibility changes
+                      if (
+                        selectedOption.TabVisibility &&
+                        selectedOption.TabVisibility.length > 0
+                      ) {
+                        selectedOption.TabVisibility.forEach(
+                          (tabVisibility: any) => {
+                            newDetails.forEach((tab: any) => {
+                              if (
+                                tab.TabAliasName?.toLowerCase() ===
+                                  tabVisibility.Tabname?.toLowerCase() ||
+                                tab.Nestedtab?.toLowerCase() ===
+                                  tabVisibility.Tabname?.toLowerCase()
+                              ) {
+                                tab.DefaultVisible = tabVisibility.IsVisible;
+                              }
+                            });
+                          },
+                        );
+                      }
+
+                      // Apply OuterTabVisibility changes
+                      if (
+                        selectedOption.OuterTabVisibility &&
+                        selectedOption.OuterTabVisibility.length > 0 &&
+                        updateTabVisibility
+                      ) {
+                        updateTabVisibility(selectedOption.OuterTabVisibility);
+                      }
+
+                      // Apply fieldnamechange updates
+                      if (
+                        selectedOption.fieldnamechange &&
+                        selectedOption.fieldnamechange.length > 0
+                      ) {
+                        selectedOption.fieldnamechange.forEach(
+                          (nameChange: any) => {
+                            newDetails.forEach((tab: any) => {
+                              tab.Values.forEach((field: any) => {
+                                if (
+                                  Number(field.FieldID) ===
+                                  Number(nameChange.FieldID)
+                                ) {
+                                  const isUploadedFilesTable =
+                                    field.FieldType === "TABLE" &&
+                                    field.FieldName === "Uploaded Files";
+
+                                  if (!isUploadedFilesTable) {
+                                    field.FieldName = nameChange.FieldName;
+                                  }
+                                }
+                              });
+                            });
+                          },
+                        );
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.error(
+                  `Error fetching dropdown data for ${response.FieldName}:`,
+                  error,
+                );
               }
             }
-          });
+          }
         }
-      });
-      if (newDetails.length > 0) {
-        const groupedFields = newDetails?.[value]?.Values?.reduce(
+      }
+
+      // Initialize addmorevalues for grouped fields
+      if (newDetails.length > 0 && newDetails[value]) {
+        const groupedFields = newDetails[value]?.Values?.reduce(
           (acc: any, field: any) => {
             if (!acc[field.AddMoreGroup]) {
               acc[field.AddMoreGroup] = [];
@@ -1983,32 +2087,33 @@ const PersonalDetails = forwardRef(
           },
           {},
         );
+
         if (groupedFields) {
-          {
-            Object?.entries(groupedFields)?.map(
-              ([groupName, fieldsInGroup]: any) => {
-                newDetails?.[value]?.Values.map((res: any) => {
-                  if (res.AddMoreGroup === groupName) {
-                    res.addmorevalues =
-                      res.addmorevalues?.length === 0
-                        ? [
-                            {
-                              ValIndex: 1,
-                              FieldValue: res.FieldValue,
-                              FieldID: res.FieldID,
-                              FieldName: res.FieldName,
-                              FieldType: res.FieldType,
-                            },
-                          ]
-                        : res.addmorevalues;
-                  }
-                });
-              },
-            );
-          }
+          Object.entries(groupedFields).forEach(
+            ([groupName, fieldsInGroup]: any) => {
+              newDetails[value]?.Values.forEach((res: any) => {
+                if (res.AddMoreGroup === groupName) {
+                  res.addmorevalues =
+                    res.addmorevalues?.length === 0
+                      ? [
+                          {
+                            ValIndex: 1,
+                            FieldValue: res.FieldValue,
+                            FieldID: res.FieldID,
+                            FieldName: res.FieldName,
+                            FieldType: res.FieldType,
+                          },
+                        ]
+                      : res.addmorevalues;
+                }
+              });
+            },
+          );
         }
       }
-      // setUpdatedPersonalDetails(newDetails);
+
+      // Update the state with the new visibility settings
+      setUpdatedPersonalDetails(newDetails);
     };
 
     const getDropdownValueFromSelection = (responseData: any, state: any) => {
