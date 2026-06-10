@@ -249,10 +249,16 @@ export const RenderFields = ({
           width: mobileLayout ? "calc(100% - 20px)" : "auto", // Full width on mobile with padding
         };
         const className = field.ClsIcon;
+        const allFieldsWithSameName = updatedPersonalDetails
+          ?.flatMap((tab: any) => tab.Values || [])
+          .filter((f: any) => f.FieldName === field.FieldName);
+        const hasDuplicateFieldName = (allFieldsWithSameName?.length || 0) > 1;
+
         const fieldProps = {
           ...field,
           hasError: hasError && isTabWithError,
           "data-field-id": field.FieldID, // For scrolling to error
+          hasDuplicateFieldName,
         };
         const showBorder = field.IsBorderApply !== false;
         const borderColor = hasError ? "#dc3545" : field.bordercolor;
@@ -273,6 +279,7 @@ export const RenderFields = ({
                 isPDFPreviewOpen={isPDFPreviewOpen}
                 isdisable={isdisable}
                 isMobile={mobileLayout}
+                updatedPersonalDetails={updatedPersonalDetails}
               />
             );
 
@@ -342,6 +349,7 @@ export const RenderFields = ({
                 isMobile={mobileLayout}
                 setApiURL={setApiURL}
                 apiURL={apiURL}
+                value={value}
               />
             );
 
@@ -377,6 +385,8 @@ export const RenderFields = ({
                 setIsModalOpen={setIsModalOpen}
                 information={information}
                 isMobile={mobileLayout}
+                saveData={saveData}
+                setSaveData={setSaveData}
               />
             );
 

@@ -14,10 +14,18 @@ export function CheckBoxField({
   setIsModalOpen,
   information,
   isMobile,
+  setSaveData,
+  saveData,
 }: any) {
   const hasError = field.hasError || false;
   const showBorder = field.IsBorderApply !== false;
   const borderColor = hasError ? "#dc3545" : field.bordercolor;
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSaveData((prev: any) => ({
+      ...prev,
+      [field.FieldName]: e.target.checked,
+    }));
+  };
   return (
     <Resizable
       enable={{
@@ -137,7 +145,8 @@ export function CheckBoxField({
             type="checkbox"
             name={field?.FieldName}
             id={field?.FieldName}
-            value={field?.FieldName}
+            checked={!!saveData?.[field.FieldName]}
+            onChange={handleCheckboxChange}
             disabled={isDrag || !isModify}
             className={`${field?.ClsIcon}`}
             style={{
