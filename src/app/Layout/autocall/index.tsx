@@ -393,7 +393,7 @@ const AutoCallPage = ({
           return { fieldsDatanew: dataOfRow };
         });
 
-        console.log("Prepared recordsbulk:", recordsbulk);
+        // console.log("Prepared recordsbulk:", recordsbulk);
 
         const data = {
           Userid: localStorage.getItem("username"),
@@ -402,7 +402,7 @@ const AutoCallPage = ({
           recordsbulk,
         };
 
-        console.log("Sending API request with data:", data);
+        // console.log("Sending API request with data:", data);
 
         const res = await axios.post(
           "https://logpanel.insurancepolicy4u.com/api/Login/UpdateDynamicFieldBulk",
@@ -414,7 +414,7 @@ const AutoCallPage = ({
           },
         );
 
-        console.log("API Response:", res);
+        // console.log("API Response:", res);
 
         if (res) {
           setSearchLeadData({ ...searchLeadData });
@@ -434,7 +434,7 @@ const AutoCallPage = ({
 
   // Create a direct save function for NewTablePage
   const handleDirectSave = async (modifiedData: any[]) => {
-    console.log("AutoCallPage: handleDirectSave called with:", modifiedData);
+    // console.log("AutoCallPage: handleDirectSave called with:", modifiedData);
 
     try {
       if (!modifiedData || modifiedData.length === 0) {

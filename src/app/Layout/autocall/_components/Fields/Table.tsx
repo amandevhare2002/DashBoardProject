@@ -96,7 +96,7 @@ export function TableField({
     sendParam: wsParam,
     enabled: !!wsUrl,
   });
-  console.log("WebSocket Data for TableField:", wsData);
+  // console.log("WebSocket Data for TableField:", wsData);
   // Your important positioning calculations - KEEP THESE
   const rowNum = isPDFPreviewOpen
     ? field.PDFRownum || field.Rownum || 0
@@ -160,7 +160,7 @@ export function TableField({
   const displaySize = getDisplaySize();
 
   const handleSelectionChanged = (selectedRows: any[]) => {
-    console.log(`Table ${field.FieldID} selected rows:`, selectedRows);
+    // console.log(`Table ${field.FieldID} selected rows:`, selectedRows);
     setSelectedRows(selectedRows);
 
     // Save to localStorage

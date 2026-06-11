@@ -1656,6 +1656,9 @@ const PersonalDetails = forwardRef(
     // Update handleInputChange function to handle tab visibility
     const handleInputChange = (e: any, isDropdown: boolean) => {
       if (isDropdown) {
+        const eventUIKey =
+          e?.target?.uiKey ||
+          (e?.target?.fieldID ? `__ui__${e.target.fieldID}` : null);
         const updatedPersonalDetailsData = [...updatedPersonalDetails];
         const dynamicFieldArray: any = [...(e.target.dropdownSplitData || [])];
 
@@ -1711,11 +1714,24 @@ const PersonalDetails = forwardRef(
         });
         let newSaveData = { ...saveData };
 
+        const fieldsWithSameName = updatedPersonalDetailsData
+          ?.flatMap((tab: any) => tab.Values || [])
+          .filter((f: any) => f.FieldName === e.target.name);
+        const isMainDropdownDuplicate = (fieldsWithSameName?.length || 0) > 1;
+
         if (dynamicFieldArray.length > 0) {
           const updatedValues = e.target.value.split("|");
 
-          // Update main field
-          newSaveData[e.target.name] = updatedValues[0];
+          // Update main dropdown field
+          if (isMainDropdownDuplicate && eventUIKey) {
+            newSaveData[eventUIKey] = updatedValues[0];
+          } else {
+            newSaveData[e.target.name] = updatedValues[0];
+            if (eventUIKey) {
+              newSaveData[eventUIKey] = updatedValues[0];
+            }
+          }
+
           // Update dependent fields from DropDownSplitData across ALL tabs
           dynamicFieldArray.forEach((splitField: any) => {
             let fieldUpdated = false;
@@ -1723,7 +1739,19 @@ const PersonalDetails = forwardRef(
               tab.Values.forEach((field: any) => {
                 if (Number(field.FieldID) === Number(splitField.FieldID)) {
                   const fieldValue = updatedValues[splitField.Index] || "";
-                  newSaveData[field.FieldName] = fieldValue;
+                  const splitUiKey = `__ui__${field.FieldID}`;
+                  const splitFieldsWithSameName = updatedPersonalDetailsData
+                    ?.flatMap((t: any) => t.Values || [])
+                    .filter((ff: any) => ff.FieldName === field.FieldName);
+                  const isSplitDuplicate =
+                    (splitFieldsWithSameName?.length || 0) > 1;
+
+                  if (isSplitDuplicate) {
+                    newSaveData[splitUiKey] = fieldValue;
+                  } else {
+                    newSaveData[field.FieldName] = fieldValue;
+                    newSaveData[splitUiKey] = fieldValue;
+                  }
                   fieldUpdated = true;
                 }
               });
@@ -1731,7 +1759,14 @@ const PersonalDetails = forwardRef(
           });
         } else {
           // Simple dropdown without split data
-          newSaveData[e.target.name] = e.target.value;
+          if (isMainDropdownDuplicate && eventUIKey) {
+            newSaveData[eventUIKey] = e.target.value;
+          } else {
+            newSaveData[e.target.name] = e.target.value;
+            if (eventUIKey) {
+              newSaveData[eventUIKey] = e.target.value;
+            }
+          }
         }
 
         // Handle child fields across ALL tabs
@@ -1782,6 +1817,9 @@ const PersonalDetails = forwardRef(
           ...saveData,
           [e.target.name]: e.target.value,
         };
+        if (e?.target?.uiKey) {
+          newSaveData[e.target.uiKey] = e.target.value;
+        }
         // Apply formulas for regular input changes across ALL tabs
         newSaveData = applyAllFormulas(newSaveData, updatedPersonalDetails);
 
@@ -1864,6 +1902,17 @@ const PersonalDetails = forwardRef(
       const payload: any = {};
       const arrays: any = {};
 
+      // Helper function to get field value (checks uiKey first for duplicates)
+      const getFieldValue = (responseField: any): string => {
+        const uiKey = `__ui__${responseField.FieldID}`;
+        // Check if value exists in uiKey (for duplicate fields)
+        if (updatedSavedData[uiKey] !== undefined) {
+          return updatedSavedData[uiKey] ?? "";
+        }
+        // Fall back to FieldName for non-duplicate fields
+        return updatedSavedData[responseField.FieldName] ?? "";
+      };
+
       if (!field.apifields) return {};
 
       for (const config of field.apifields) {
@@ -1917,9 +1966,8 @@ const PersonalDetails = forwardRef(
                     response.addmorevalues?.[addMoreIndex]?.FieldValue || "";
                   entry.ParentValue = addMoreValue;
                 } else {
-                  // Regular field - get from saveData
-                  entry.ParentValue =
-                    updatedSavedData[response.FieldName] || "";
+                  // Regular field - get from saveData using uiKey-aware method
+                  entry.ParentValue = getFieldValue(response);
                 }
               }
             });

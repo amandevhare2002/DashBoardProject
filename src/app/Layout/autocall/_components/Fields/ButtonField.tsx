@@ -78,7 +78,7 @@ export const ButtonField = ({
   setApiURL,
   apiURL,
 }: any) => {
-  console.log("fieldfieldfieldfield", field.ValueType);
+  // console.log("fieldfieldfieldfield", field.ValueType);
   const [isButtonLoading, setIsButtonLoading] = useState(false);
   const [isEditorModalOpen, setIsEditorModalOpen] = useState(false);
   const [isEditorDrawerOpen, setIsEditorDrawerOpen] = useState(false);
