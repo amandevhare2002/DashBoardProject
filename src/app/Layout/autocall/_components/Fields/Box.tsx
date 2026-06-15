@@ -24,14 +24,7 @@ export function BoxField({
   isMobile,
 }: any) {
   const [regexError, setRegexError] = useState<string | null>(null);
-  const uiKey = `__ui__${field.FieldID}`;
-  const effectiveValue =
-    saveData?.[uiKey] !== undefined
-      ? saveData[uiKey]
-      : field.hasDuplicateFieldName
-        ? ""
-        : saveData?.[field.FieldName] || "";
-  const [localValue, setLocalValue] = useState<string>(effectiveValue);
+  const [localValue, setLocalValue] = useState<string>("");
 
   // Refs to track user interaction and prevent loops
   const isUserTypingRef = useRef(false);
@@ -39,7 +32,8 @@ export function BoxField({
   const lastProgrammaticUpdateRef = useRef<string | null>(null);
   const isInitializedRef = useRef(false);
 
-  const hasError = (!effectiveValue && field.IsMandatory) || field.hasError;
+  const hasError =
+    (!saveData[field.FieldName] && field.IsMandatory) || field.hasError;
 
   // Validate regex function
   const validateRegex = (value: string) => {
@@ -56,16 +50,11 @@ export function BoxField({
   // Initialize local value from saveData (only once)
   useEffect(() => {
     if (!isInitializedRef.current) {
-      const initialValue =
-        saveData?.[uiKey] !== undefined
-          ? saveData[uiKey]
-          : field.hasDuplicateFieldName
-            ? ""
-            : saveData?.[field.FieldName] || "";
+      const initialValue = saveData[field.FieldName] || "";
       setLocalValue(initialValue);
       isInitializedRef.current = true;
     }
-  }, [field.FieldName, field.hasDuplicateFieldName, saveData, uiKey]);
+  }, [field.FieldName, saveData]);
 
   // Update local value when saveData changes (but not during user typing)
   useEffect(() => {
@@ -76,12 +65,7 @@ export function BoxField({
     if (isUserTypingRef.current) return;
 
     // Skip if this is a programmatic update we just made
-    const newValue =
-      saveData?.[uiKey] !== undefined
-        ? saveData[uiKey]
-        : field.hasDuplicateFieldName
-          ? ""
-          : saveData[field.FieldName] || "";
+    const newValue = saveData[field.FieldName] || "";
     if (lastProgrammaticUpdateRef.current === newValue) {
       lastProgrammaticUpdateRef.current = null;
       return;
@@ -91,13 +75,7 @@ export function BoxField({
     if (localValue !== newValue) {
       setLocalValue(newValue);
     }
-  }, [
-    saveData,
-    field.FieldName,
-    field.hasDuplicateFieldName,
-    localValue,
-    uiKey,
-  ]);
+  }, [saveData[field.FieldName], field.FieldName, localValue]);
 
   // Handle formula calculations (only when NOT typing)
   useEffect(() => {
@@ -116,10 +94,7 @@ export function BoxField({
 
     if (calculatedValue !== null && calculatedValue !== undefined) {
       const calculatedStr = String(calculatedValue);
-      const currentValue =
-        saveData?.[uiKey] !== undefined
-          ? saveData[uiKey]
-          : saveData[field.FieldName];
+      const currentValue = saveData[field.FieldName];
 
       // Only update if different
       if (currentValue !== calculatedStr) {
@@ -133,7 +108,6 @@ export function BoxField({
         setSaveData((prev: any) => ({
           ...prev,
           [field.FieldName]: calculatedStr,
-          [uiKey]: calculatedStr,
         }));
 
         // Only call handleInputChange if it's not a user edit
@@ -142,8 +116,6 @@ export function BoxField({
             {
               target: {
                 name: field.FieldName,
-                fieldID: field.FieldID,
-                uiKey,
                 value: calculatedStr,
               },
             },
@@ -154,15 +126,10 @@ export function BoxField({
     }
   }, [
     saveData,
-    field.FieldID,
     field.IsFormulaApply,
     field.Formula,
     calculateFormula,
     field.FieldName,
-    field.hasDuplicateFieldName,
-    handleInputChange,
-    setSaveData,
-    uiKey,
   ]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,22 +162,11 @@ export function BoxField({
     setSaveData((prev: any) => ({
       ...prev,
       [field.FieldName]: newValue,
-      [uiKey]: newValue,
     }));
 
     // Call handleInputChange for side effects (validation, etc.)
     if (handleInputChange) {
-      handleInputChange(
-        {
-          ...e,
-          target: {
-            ...e.target,
-            fieldID: field.FieldID,
-            uiKey,
-          },
-        },
-        false,
-      );
+      handleInputChange(e, false);
     }
 
     // Reset typing flag after user stops typing
@@ -228,7 +184,6 @@ export function BoxField({
             setSaveData((prev: any) => ({
               ...prev,
               [field.FieldName]: calculatedStr,
-              [uiKey]: calculatedStr,
             }));
           }
         }

@@ -109,21 +109,9 @@ export function DropDownField({
 
   const displaySize = getDisplaySize();
 
-  // Use a per-field UI key (based on FieldID) to avoid collisions when multiple
-  // fields share the same FieldName across different tabs.
-  const uiKey = `__ui__${field?.FieldID}`;
-  const allFields = updatedPersonalDetails
-    ?.flatMap((tab: any) => tab.Values || [])
-    .filter((f: any) => f.FieldName === field.FieldName);
-  const hasDuplicateFieldName = (allFields?.length || 0) > 1;
-
   const currentValue = isSearch
     ? searchValues[field.FieldName]
-    : saveData?.[uiKey] !== undefined
-      ? saveData[uiKey]
-      : hasDuplicateFieldName
-        ? ""
-        : (saveData?.[field.FieldName] ?? field.FieldValue ?? "");
+    : saveData[field?.FieldName];
 
   const selectedOption = field.DropdownArray?.find(
     (opt: any) => opt.value === currentValue,
@@ -253,16 +241,6 @@ export function DropDownField({
             newUpdatedDetails.forEach((resp: any) => {
               resp?.Values?.forEach((r: any) => {
                 if (Number(r.FieldID) === Number(f.FieldID)) {
-                  const uiKeyForField = `__ui__${r.FieldID}`;
-                  const isDuplicateFieldName =
-                    updatedPersonalDetails
-                      ?.flatMap((tab: any) => tab.Values || [])
-                      .filter((xff: any) => xff.FieldName === r.FieldName)
-                      .length > 1;
-
-                  if (isDuplicateFieldName) {
-                    updatedSaveData[uiKeyForField] = f.Value;
-                  }
                   updatedSaveData[r.FieldName] = f.Value;
                   r.DefaultVisible = f.Visibility;
                   if (r.FieldType === "IMAGE") {
@@ -295,10 +273,8 @@ export function DropDownField({
           }
 
           // CRITICAL: Restore the selected dropdown value
-          // Write to BOTH keys for initial compatibility, but reads prioritize uiKey.
           if (selectedUIOption) {
             updatedSaveData[field.FieldName] = selectedUIOption.value;
-            updatedSaveData[uiKey] = selectedUIOption.value;
 
             // Also update the local selected option to match
             setLocalSelectedOption({
@@ -403,28 +379,13 @@ export function DropDownField({
     if (isSearch) {
       setSearchValues({
         ...searchValues,
-        [field.FieldName]: mainFieldValue,
+        [field.FieldName]: mainFieldValue, // Store only the first part
       });
     } else {
       const updatedSaveData = { ...saveData };
 
-      // Create UI key based on FieldID to make this field instance unique
-      const uiKey = `__ui__${field.FieldID}`;
-
-      // Check if there are multiple fields with the same name
-      const allFieldsWithSameName = updatedPersonalDetails
-        ?.flatMap((tab: any) => tab.Values || [])
-        .filter((f: any) => f.FieldName === field.FieldName);
-
-      const hasDuplicateFieldName = (allFieldsWithSameName?.length || 0) > 1;
-
-      if (hasDuplicateFieldName) {
-        // Store only on the per-instance key to avoid leaking into other same-name fields
-        updatedSaveData[uiKey] = mainFieldValue;
-      } else {
-        // No duplicates, store normally on the shared field name
-        updatedSaveData[field.FieldName] = mainFieldValue;
-      }
+      // Set the main field value (first part only)
+      updatedSaveData[field.FieldName] = mainFieldValue;
 
       // Handle split data - update each split field with its corresponding part
       if (
@@ -433,64 +394,18 @@ export function DropDownField({
         valueParts.length > 1
       ) {
         field.DropDownSplitData.forEach((splitField: any) => {
-          const splitIndex = splitField.Index;
-          const partValue = valueParts[splitIndex];
+          const splitIndex = splitField.Index; // This should be 1-based index from the configuration
+          const partValue = valueParts[splitIndex]; // Use the split index to get the correct part
 
           if (partValue !== undefined) {
             updatedPersonalDetails?.forEach((tab: any) => {
               tab.Values?.forEach((f: any) => {
                 if (Number(f.FieldID) === Number(splitField.FieldID)) {
-                  // Use UI key for split fields too
-                  const splitUiKey = `__ui__${splitField.FieldID}`;
-
-                  // Check if split field also has duplicates
-                  const splitFieldsWithSameName = updatedPersonalDetails
-                    ?.flatMap((t: any) => t.Values || [])
-                    .filter((ff: any) => ff.FieldName === f.FieldName);
-
-                  const hasSplitDuplicate =
-                    (splitFieldsWithSameName?.length || 0) > 1;
-
-                  if (hasSplitDuplicate) {
-                    updatedSaveData[splitUiKey] = partValue;
-                  } else {
-                    updatedSaveData[f.FieldName] = partValue;
-                  }
+                  updatedSaveData[f.FieldName] = partValue;
                 }
               });
             });
           }
-        });
-      }
-
-      // Handle child fields
-      if (
-        field?.childfields &&
-        Array.isArray(field.childfields) &&
-        selectedOption?.childfields
-      ) {
-        selectedOption.childfields.forEach((childField: any) => {
-          updatedPersonalDetails?.forEach((tab: any) => {
-            tab.Values?.forEach((f: any) => {
-              if (Number(f.FieldID) === Number(childField.FieldID)) {
-                const childUiKey = `__ui__${childField.FieldID}`;
-                const childValue = childField.Value || "";
-
-                const childFieldsWithSameName = updatedPersonalDetails
-                  ?.flatMap((t: any) => t.Values || [])
-                  .filter((ff: any) => ff.FieldName === f.FieldName);
-
-                const hasChildDuplicate =
-                  (childFieldsWithSameName?.length || 0) > 1;
-
-                if (hasChildDuplicate) {
-                  updatedSaveData[childUiKey] = childValue;
-                } else {
-                  updatedSaveData[f.FieldName] = childValue;
-                }
-              }
-            });
-          });
         });
       }
 
@@ -516,10 +431,7 @@ export function DropDownField({
       const event = {
         target: {
           name: field.FieldName,
-          fieldID: field.FieldID,
-          uiKey,
-          fieldName: field.FieldName,
-          value: fullValue,
+          value: fullValue, // Send full pipe-separated value to handleInputChange
           dropdownSplitData: field?.DropDownSplitData || [],
           fieldnamechange: selectedOption?.fieldnamechange || [],
           visibilityfields: selectedOption?.visibilityfields || [],
@@ -532,17 +444,16 @@ export function DropDownField({
       // Call handleInputChange
       handleInputChange(event, true);
 
-      // Call API if needed
+      // Call API if needed - pass the UPDATED save data that has ONLY the main field value
       if (field.IsAPICall && field.APIURL2) {
+        // Create a clean version of saveData with only the main field value (not the full pipe-separated)
         const cleanSaveData = {
           ...updatedSaveData,
-          [field.FieldName]: mainFieldValue,
+          [field.FieldName]: mainFieldValue, // Ensure main field has only first part
         };
-        await callDropdownAPI(cleanSaveData, {
-          value: mainFieldValue,
-          label: selectedOption.label,
-          fullValue: fullValue,
-        });
+
+        // Pass the clean save data to API call and wait for it
+        await callDropdownAPI(cleanSaveData, selectedValueForUI);
       }
     }
   };

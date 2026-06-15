@@ -20,14 +20,8 @@ export function LableField({
   isMobile = false,
   isSearch,
 }: any) {
-  const uiKey = `__ui__${field.FieldID}`;
-  const displayValue =
-    saveData?.[uiKey] !== undefined
-      ? saveData[uiKey]
-      : field.hasDuplicateFieldName
-        ? ""
-        : saveData?.[field.FieldName] || "";
-  const hasError = (!displayValue && field.IsMandatory) || field.hasError;
+  const hasError =
+    (!saveData[field.FieldName] && field.IsMandatory) || field.hasError;
   const rowNum = isPDFPreviewOpen
     ? field.PDFRownum || field.Rownum || 0
     : field.Rownum || 0;
@@ -216,11 +210,7 @@ export function LableField({
               }}
               className={`${field?.ClsIcon}`}
             >
-              {saveData?.[uiKey] !== undefined
-                ? saveData[uiKey]
-                : field.hasDuplicateFieldName
-                  ? ""
-                  : saveData?.[field.FieldName] || ""}
+              {saveData[field.FieldName]}
             </p>
           </BoxComponent>
         </FormGroup>
