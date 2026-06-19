@@ -3196,488 +3196,459 @@ const AutoCallPage = ({
                   </Modal>
 
                   <CustomTabPanel value={value} index={4}>
-                    {/* <StableAccordionEnterprise /> */}
                     <Button onClick={() => setIsCardView(!isCardView)}>
                       Is Card View
                     </Button>
-                    <SearchDropArea
-                      isDrag={isDrag}
-                      onDrop={moveSearchBox} // Your moveSearchBox function
-                    >
-                      <div className="flex px-2 space-x-2 items-center mt-14">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {filterFields.map((field) => {
+
+                    {/* ── SearchDropArea needs position:relative + explicit min-height so
+       react-dnd can compute drop coordinates across the full height ── */}
+                    <SearchDropArea isDrag={isDrag} onDrop={moveSearchBox}>
+                      {/* ── Compute the bottom edge of the lowest field so the table
+         can be pushed below it, regardless of count / type / drag position ── */}
+                      {(() => {
+                        // Calculate the pixel bottom of every rendered search field.
+                        // Fields are absolutely-positioned using Colnum (top) + Height.
+                        const fieldBottoms = filterFields
+                          .filter((f) => f.DefaultVisible !== false)
+                          .map((f) => {
                             const fieldPosition = searchFieldPositions[
-                              field.FieldID
+                              f.FieldID
                             ] || {
-                              Rownum: 0,
-                              Colnum: 0,
-                              Width: "100%",
-                              Height: "38px",
+                              Rownum: f.SearchRownum || f.Rownum || 0,
+                              Colnum: f.SearchColnum || f.Colnum || 0,
+                              Width: f.SearchWidth || f.Width || "100%",
+                              Height: f.SearchHeight || f.Height || "38px",
                             };
-                            const fieldStyle: CSSProperties = {
-                              position: "absolute",
-                              cursor: isDrag ? "move" : "default",
-                              border: isDrag ? "1px dashed gray" : "0px",
-                              backgroundColor: isDrag ? "white" : "transparent",
-                              paddingLeft: isDrag ? "0.5rem" : "0rem",
-                            };
+                            const top = Number(fieldPosition.Colnum) || 0;
+                            // Parse "38px" → 38, or fall through to 80 as a safe default
+                            const height =
+                              parseInt(
+                                String(fieldPosition.Height).replace("px", ""),
+                              ) || 80;
+                            // Labels sit 25px above their top due to the -25px marginTop on the label element;
+                            // add that offset so we don't clip the label text.
+                            const labelOffset =
+                              f.FieldType === "LABEL" ? 0 : 25;
+                            return top + height + labelOffset;
+                          });
 
-                            switch (field.FieldType) {
-                              case "LABEL":
-                                return (
-                                  <LableField
-                                    key={field.FieldID}
-                                    style={fieldStyle}
-                                    field={{
-                                      ...field,
-                                      Rownum: fieldPosition.Rownum,
-                                      Colnum: fieldPosition.Colnum,
-                                      Width: fieldPosition.Width,
-                                      Height: fieldPosition.Height,
-                                      PDFRownum:
-                                        fieldPosition.PDFRownum ||
-                                        fieldPosition.Rownum,
-                                      PDFColnum:
-                                        fieldPosition.PDFColnum ||
-                                        fieldPosition.Colnum,
-                                      PDFWidth:
-                                        fieldPosition.PDFWidth ||
-                                        fieldPosition.Width,
-                                      PDFHeight:
-                                        fieldPosition.PDFHeight ||
-                                        fieldPosition.Height,
-                                    }}
-                                    isModify={true}
-                                    saveData={searchValues}
-                                    information={information}
-                                    isDrag={isSearchDrag}
-                                    isSearch={true}
-                                    onResize={handleSearchFieldResize}
-                                  />
-                                );
-                              case "BOX":
-                                return (
-                                  <BoxField
-                                    style={fieldStyle}
-                                    key={field.FieldID}
-                                    field={{
-                                      ...field,
-                                      Rownum: fieldPosition.Rownum,
-                                      Colnum: fieldPosition.Colnum,
-                                      Width: fieldPosition.Width,
-                                      Height: fieldPosition.Height,
-                                      PDFRownum:
-                                        fieldPosition.PDFRownum ||
-                                        fieldPosition.Rownum,
-                                      PDFColnum:
-                                        fieldPosition.PDFColnum ||
-                                        fieldPosition.Colnum,
-                                      PDFWidth:
-                                        fieldPosition.PDFWidth ||
-                                        fieldPosition.Width,
-                                      PDFHeight:
-                                        fieldPosition.PDFHeight ||
-                                        fieldPosition.Height,
-                                    }}
-                                    isModify={true}
-                                    saveData={searchValues}
-                                    handleInputChange={(
-                                      e: React.ChangeEvent<HTMLInputElement>,
-                                    ) => handleSearchInputChange(e, field)}
-                                    information={information}
-                                    isDrag={isSearchDrag}
-                                    onResize={handleSearchFieldResize}
-                                    setSaveData={setSearchValues}
-                                  />
-                                );
-                              case "DATE":
-                                return (
-                                  <DateField
-                                    style={fieldStyle}
-                                    field={{
-                                      ...field,
-                                      Rownum: fieldPosition.Rownum,
-                                      Colnum: fieldPosition.Colnum,
-                                      Width: fieldPosition.Width,
-                                      Height: fieldPosition.Height,
-                                      PDFRownum:
-                                        fieldPosition.PDFRownum ||
-                                        fieldPosition.Rownum,
-                                      PDFColnum:
-                                        fieldPosition.PDFColnum ||
-                                        fieldPosition.Colnum,
-                                      PDFWidth:
-                                        fieldPosition.PDFWidth ||
-                                        fieldPosition.Width,
-                                      PDFHeight:
-                                        fieldPosition.PDFHeight ||
-                                        fieldPosition.Height,
-                                    }}
-                                    isModify={true}
-                                    searchValues={searchValues}
-                                    setSearchValues={setSearchValues}
-                                    information={information}
-                                    isDrag={isSearchDrag}
-                                    isSearch={true}
-                                    onChange={(
-                                      dates: [Date | null, Date | null],
-                                    ) => {
-                                      setSearchValues({
-                                        ...searchValues,
-                                        [field.FieldName]:
-                                          dates[0] && dates[1]
-                                            ? `${moment(dates[0]).format("YYYY-MM-DD")}|${moment(dates[1]).format("YYYY-MM-DD")}`
-                                            : "",
-                                      });
-                                    }}
-                                    onResize={handleSearchFieldResize}
-                                  />
-                                );
-                              // In AutoCallPage component, update the case for 'DROPDOWN' in your search fields render
-                              case "DROPDOWN":
-                                const dropdownField = filterFields.find(
-                                  (f) => f.FieldID === field.FieldID,
-                                );
-                                const dropdownOptions =
-                                  dropdownField?.DropdownArray || [];
+                        // Highest bottom + comfortable breathing room below the last field.
+                        // Fall back to 200 when there are no fields yet.
+                        const maxBottom =
+                          fieldBottoms.length > 0
+                            ? Math.max(...fieldBottoms) + 24
+                            : 200;
 
-                                // Get the actual field configuration
-                                const searchDropdownField = filterFields.find(
-                                  (f) => f.FieldID === field.FieldID,
-                                );
-
-                                return (
-                                  <DropDownField
-                                    style={fieldStyle}
-                                    key={field.FieldID}
-                                    field={{
-                                      ...field,
-                                      Rownum: fieldPosition.Rownum,
-                                      Colnum: fieldPosition.Colnum,
-                                      Width: fieldPosition.Width,
-                                      Height: fieldPosition.Height,
-                                      PDFRownum:
-                                        fieldPosition.PDFRownum ||
-                                        fieldPosition.Rownum,
-                                      PDFColnum:
-                                        fieldPosition.PDFColnum ||
-                                        fieldPosition.Colnum,
-                                      PDFWidth:
-                                        fieldPosition.PDFWidth ||
-                                        fieldPosition.Width,
-                                      PDFHeight:
-                                        fieldPosition.PDFHeight ||
-                                        fieldPosition.Height,
-                                      // DropdownArray: dropdownOptions,
-                                      // FieldName: field.FieldName,
-                                      // FieldID: field.FieldID,
-                                      // FieldType: 'DROPDOWN',
-                                      // IsFieldNamePrint: true,
-                                      // IsMandatory: false,
-                                      // // Copy all properties from the original field
-                                      // ...searchDropdownField,
-                                      // // Ensure APIURL is included
-                                      // APIURL: searchDropdownField?.APIURL || field.APIURL,
-                                      // apifields: searchDropdownField?.apifields || field.apifields,
-                                      // ServerName: searchDropdownField?.ServerName || field.ServerName,
-                                      // Dbname: searchDropdownField?.Dbname || field.Dbname,
-                                      // Tabname: searchDropdownField?.Tabname || field.Tabname,
-                                      // Colname: searchDropdownField?.Colname || field.Colname,
-                                      // TextAlignment: 'left',
-                                      // TextFontColor: '#000000',
-                                      // Fontname: 'inherit',
-                                      // TextFontSize: 14,
-                                      // Fieldbgcolor: '#ffffff',
-                                      // IsReadOnly: false,
-                                      // ClsIcon: '',
-                                      // MWidth: '100%',
-                                      // MHeight: '38px',
-                                    }}
-                                    isModify={true}
-                                    isDrag={isSearchDrag}
-                                    isSearch={true}
-                                    searchValues={searchValues}
-                                    setSearchValues={setSearchValues}
-                                    promiseOptions={(inputValue: string) => {
-                                      return new Promise((resolve) => {
-                                        // Pass the field to AddDropDownData
-                                        AddDropDownData(
-                                          inputValue,
-                                          searchDropdownField || field,
-                                        )
-                                          .then((options) => resolve(options))
-                                          .catch(() => resolve([]));
-                                      });
-                                    }}
-                                    handleInputChange={(
-                                      selectedOption: any,
-                                    ) => {
-                                      handleDropdownChange(
-                                        selectedOption,
-                                        field,
-                                      );
-
-                                      // If dropdown has childfields, trigger their refresh
-                                      if (
-                                        searchDropdownField?.childfields &&
-                                        searchDropdownField.childfields.length >
-                                          0
-                                      ) {
-                                        handleDropdownChildFields(
-                                          selectedOption,
-                                          searchDropdownField.childfields,
-                                        );
-                                      }
-                                    }}
-                                    information={information}
-                                    isMobile={isMobile}
-                                    onResize={handleSearchFieldResize}
-                                  />
-                                );
-                              case "BUTTON":
-                                return (
-                                  <ButtonField
-                                    style={fieldStyle}
-                                    key={field.FieldID}
-                                    field={{
-                                      ...field,
-                                      Rownum: fieldPosition.Rownum,
-                                      Colnum: fieldPosition.Colnum,
-                                      Width: fieldPosition.Width,
-                                      Height: fieldPosition.Height,
-                                      PDFRownum:
-                                        fieldPosition.PDFRownum ||
-                                        fieldPosition.Rownum,
-                                      PDFColnum:
-                                        fieldPosition.PDFColnum ||
-                                        fieldPosition.Colnum,
-                                      PDFWidth:
-                                        fieldPosition.PDFWidth ||
-                                        fieldPosition.Width,
-                                      PDFHeight:
-                                        fieldPosition.PDFHeight ||
-                                        fieldPosition.Height,
-                                      ValueType: "SEARCH", // ← Add this to override the ValueType
-                                      onClick: handleSearch, // ← Pass the search handler
-                                    }}
-                                    isModify={true}
-                                    saveData={searchValues}
-                                    information={information}
-                                    isDrag={isSearchDrag}
-                                    onClick={handleSearch}
-                                    onResize={handleSearchFieldResize}
-                                    setLoading={setLoading}
-                                  />
-                                );
-                              default:
-                                return null;
-                            }
-                          })}
-                        </div>
-                      </div>
-
-                      {isCardView ? (
-                        <div
-                          style={{
-                            position: "relative",
-                            height: "100vh",
-                            overflow: "auto",
-                            top: "30px",
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: `repeat(${cardViewData[0].Gridcnt}, 1fr)`,
-                              gap: "20px",
-                              padding: "20px",
-                            }}
-                          >
-                            {cardViewData.map(
-                              (data: any, dataIndex: number) => {
-                                return data?.tableArray?.map(
-                                  (response: any, index: number) => {
-                                    return (
-                                      <Card
-                                        key={`${dataIndex}-${index}`}
-                                        style={{
-                                          height: data.Height
-                                            ? Number(
-                                                data.Height.split("px")[0],
-                                              ) + 20
-                                            : 200,
-                                          width: "100%",
-                                        }}
-                                      >
-                                        <CardHeader>
-                                          <CardTitle>
-                                            {data.FieldName}
-                                          </CardTitle>
-                                        </CardHeader>
-
-                                        <div
-                                          style={{
-                                            position: "relative",
-                                            width: "100%",
-                                            height: "100%",
-                                            backgroundColor: "white",
-                                          }}
-                                        >
-                                          {data?.cardFields?.map(
-                                            (res: any, i: number) => {
-                                              const rownum =
-                                                res.CardRownum ||
-                                                res.Rownum ||
-                                                0;
-                                              const colnum =
-                                                res.CardColnum ||
-                                                res.Colnum ||
-                                                0;
-
-                                              return (
-                                                <div
-                                                  key={i}
-                                                  style={{
-                                                    position: "absolute",
-                                                    top: `${colnum}px`,
-                                                    left: `${rownum}px`,
-                                                    height:
-                                                      res.CardHeight ||
-                                                      res.Height ||
-                                                      "auto",
-                                                    width:
-                                                      res.CardWidth ||
-                                                      res.Width ||
-                                                      "100%",
-                                                    padding: "2px",
-                                                  }}
-                                                >
-                                                  {response[res.Colname] || ""}
-                                                </div>
-                                              );
-                                            },
-                                          )}
-                                        </div>
-                                      </Card>
-                                    );
-                                  },
-                                );
-                              },
-                            )}
-                          </div>
-
-                          {cardViewData.length === 0 && (
+                        return (
+                          <>
+                            {/* ── Invisible spacer that reserves the field area so the
+               drop container has the correct height for full-area DnD ── */}
                             <div
                               style={{
-                                textAlign: "center",
-                                color: "#666",
-                                marginTop: "200px",
+                                position: "relative",
+                                height: `${maxBottom}px`,
+                                width: "100%",
                               }}
                             >
-                              <h3>No card data available</h3>
-                              <p>
-                                Perform a search with card view configuration
-                              </p>
+                              {filterFields.map((field) => {
+                                const fieldPosition = searchFieldPositions[
+                                  field.FieldID
+                                ] || {
+                                  Rownum:
+                                    field.SearchRownum || field.Rownum || 0,
+                                  Colnum:
+                                    field.SearchColnum || field.Colnum || 0,
+                                  Width:
+                                    field.SearchWidth || field.Width || "100%",
+                                  Height:
+                                    field.SearchHeight ||
+                                    field.Height ||
+                                    "38px",
+                                  PDFRownum: field.PDFRownum || 0,
+                                  PDFColnum: field.PDFColnum || 0,
+                                  PDFWidth: field.PDFWidth || "100%",
+                                  PDFHeight: field.PDFHeight || "38px",
+                                };
+                                const fieldStyle: CSSProperties = {
+                                  position: "absolute",
+                                  cursor: isDrag ? "move" : "default",
+                                  border: isDrag ? "1px dashed gray" : "0px",
+                                  backgroundColor: isDrag
+                                    ? "white"
+                                    : "transparent",
+                                  paddingLeft: isDrag ? "0.5rem" : "0rem",
+                                };
+
+                                switch (field.FieldType) {
+                                  case "LABEL":
+                                    return (
+                                      <LableField
+                                        key={field.FieldID}
+                                        style={fieldStyle}
+                                        field={{
+                                          ...field,
+                                          Rownum: fieldPosition.Rownum,
+                                          Colnum: fieldPosition.Colnum,
+                                          Width: fieldPosition.Width,
+                                          Height: fieldPosition.Height,
+                                          PDFRownum:
+                                            fieldPosition.PDFRownum ||
+                                            fieldPosition.Rownum,
+                                          PDFColnum:
+                                            fieldPosition.PDFColnum ||
+                                            fieldPosition.Colnum,
+                                          PDFWidth:
+                                            fieldPosition.PDFWidth ||
+                                            fieldPosition.Width,
+                                          PDFHeight:
+                                            fieldPosition.PDFHeight ||
+                                            fieldPosition.Height,
+                                        }}
+                                        isModify={true}
+                                        saveData={searchValues}
+                                        information={information}
+                                        isDrag={isSearchDrag}
+                                        isSearch={true}
+                                        onResize={handleSearchFieldResize}
+                                      />
+                                    );
+                                  case "BOX":
+                                    return (
+                                      <BoxField
+                                        style={fieldStyle}
+                                        key={field.FieldID}
+                                        field={{
+                                          ...field,
+                                          Rownum: fieldPosition.Rownum,
+                                          Colnum: fieldPosition.Colnum,
+                                          Width: fieldPosition.Width,
+                                          Height: fieldPosition.Height,
+                                          PDFRownum:
+                                            fieldPosition.PDFRownum ||
+                                            fieldPosition.Rownum,
+                                          PDFColnum:
+                                            fieldPosition.PDFColnum ||
+                                            fieldPosition.Colnum,
+                                          PDFWidth:
+                                            fieldPosition.PDFWidth ||
+                                            fieldPosition.Width,
+                                          PDFHeight:
+                                            fieldPosition.PDFHeight ||
+                                            fieldPosition.Height,
+                                        }}
+                                        isModify={true}
+                                        saveData={searchValues}
+                                        handleInputChange={(
+                                          e: React.ChangeEvent<HTMLInputElement>,
+                                        ) => handleSearchInputChange(e, field)}
+                                        information={information}
+                                        isDrag={isSearchDrag}
+                                        onResize={handleSearchFieldResize}
+                                        setSaveData={setSearchValues}
+                                      />
+                                    );
+                                  case "DATE":
+                                    return (
+                                      <DateField
+                                        style={fieldStyle}
+                                        field={{
+                                          ...field,
+                                          Rownum: fieldPosition.Rownum,
+                                          Colnum: fieldPosition.Colnum,
+                                          Width: fieldPosition.Width,
+                                          Height: fieldPosition.Height,
+                                          PDFRownum:
+                                            fieldPosition.PDFRownum ||
+                                            fieldPosition.Rownum,
+                                          PDFColnum:
+                                            fieldPosition.PDFColnum ||
+                                            fieldPosition.Colnum,
+                                          PDFWidth:
+                                            fieldPosition.PDFWidth ||
+                                            fieldPosition.Width,
+                                          PDFHeight:
+                                            fieldPosition.PDFHeight ||
+                                            fieldPosition.Height,
+                                        }}
+                                        isModify={true}
+                                        searchValues={searchValues}
+                                        setSearchValues={setSearchValues}
+                                        information={information}
+                                        isDrag={isSearchDrag}
+                                        isSearch={true}
+                                        onChange={(
+                                          dates: [Date | null, Date | null],
+                                        ) => {
+                                          setSearchValues({
+                                            ...searchValues,
+                                            [field.FieldName]:
+                                              dates[0] && dates[1]
+                                                ? `${moment(dates[0]).format("YYYY-MM-DD")}|${moment(dates[1]).format("YYYY-MM-DD")}`
+                                                : "",
+                                          });
+                                        }}
+                                        onResize={handleSearchFieldResize}
+                                      />
+                                    );
+                                  case "DROPDOWN": {
+                                    const searchDropdownField =
+                                      filterFields.find(
+                                        (f) => f.FieldID === field.FieldID,
+                                      );
+                                    return (
+                                      <DropDownField
+                                        style={fieldStyle}
+                                        key={field.FieldID}
+                                        field={{
+                                          ...field,
+                                          Rownum: fieldPosition.Rownum,
+                                          Colnum: fieldPosition.Colnum,
+                                          Width: fieldPosition.Width,
+                                          Height: fieldPosition.Height,
+                                          PDFRownum:
+                                            fieldPosition.PDFRownum ||
+                                            fieldPosition.Rownum,
+                                          PDFColnum:
+                                            fieldPosition.PDFColnum ||
+                                            fieldPosition.Colnum,
+                                          PDFWidth:
+                                            fieldPosition.PDFWidth ||
+                                            fieldPosition.Width,
+                                          PDFHeight:
+                                            fieldPosition.PDFHeight ||
+                                            fieldPosition.Height,
+                                        }}
+                                        isModify={true}
+                                        isDrag={isSearchDrag}
+                                        isSearch={true}
+                                        searchValues={searchValues}
+                                        setSearchValues={setSearchValues}
+                                        promiseOptions={(inputValue: string) =>
+                                          new Promise((resolve) => {
+                                            AddDropDownData(
+                                              inputValue,
+                                              searchDropdownField || field,
+                                            )
+                                              .then((options) =>
+                                                resolve(options),
+                                              )
+                                              .catch(() => resolve([]));
+                                          })
+                                        }
+                                        handleInputChange={(
+                                          selectedOption: any,
+                                        ) => {
+                                          handleDropdownChange(
+                                            selectedOption,
+                                            field,
+                                          );
+                                          if (
+                                            searchDropdownField?.childfields &&
+                                            searchDropdownField.childfields
+                                              .length > 0
+                                          ) {
+                                            handleDropdownChildFields(
+                                              selectedOption,
+                                              searchDropdownField.childfields,
+                                            );
+                                          }
+                                        }}
+                                        information={information}
+                                        isMobile={isMobile}
+                                        onResize={handleSearchFieldResize}
+                                      />
+                                    );
+                                  }
+                                  case "BUTTON":
+                                    return (
+                                      <ButtonField
+                                        style={fieldStyle}
+                                        key={field.FieldID}
+                                        field={{
+                                          ...field,
+                                          Rownum: fieldPosition.Rownum,
+                                          Colnum: fieldPosition.Colnum,
+                                          Width: fieldPosition.Width,
+                                          Height: fieldPosition.Height,
+                                          PDFRownum:
+                                            fieldPosition.PDFRownum ||
+                                            fieldPosition.Rownum,
+                                          PDFColnum:
+                                            fieldPosition.PDFColnum ||
+                                            fieldPosition.Colnum,
+                                          PDFWidth:
+                                            fieldPosition.PDFWidth ||
+                                            fieldPosition.Width,
+                                          PDFHeight:
+                                            fieldPosition.PDFHeight ||
+                                            fieldPosition.Height,
+                                          ValueType: "SEARCH",
+                                          onClick: handleSearch,
+                                        }}
+                                        isModify={true}
+                                        saveData={searchValues}
+                                        information={information}
+                                        isDrag={isSearchDrag}
+                                        onClick={handleSearch}
+                                        onResize={handleSearchFieldResize}
+                                        setLoading={setLoading}
+                                      />
+                                    );
+                                  default:
+                                    return null;
+                                }
+                              })}
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "10px",
-                          }}
-                        >
-                          {/* {Object.keys(searchLeadData).map((key: any) => {
-                        return (
-                          <MainTable
-                            title={""}
-                            columns={columnsSearchLead}
-                            TableArray={searchLeadData?.tables || []}
-                            IsDetailPopupOpen={searchLeadData?.isDetailPopupOpen || false}
-                            handleTableLinkClick={handleTableLinkClick}
-                            menuID={menuID}
-                          />
-                        );
-                      })} */}
-                          {isFileUpload && (
-                            <ExcelUploadUtility
-                              reportData={reportData}
-                              token={token}
-                            />
-                          )}
-                          {searchLeadData?.tables && (
-                            <div>
-                              {/* <div>
-                              <MainTable
-                                title={"Record Table"}
-                                columns={columnsSearchLead}
-                                TableArray={searchLeadData?.tables || []}
-                                tableFooter={searchLeadData?.tableWidth || []}
-                                IsDetailPopupOpen={searchLeadData?.isDetailPopupOpen || false}
-                                handleTableLinkClick={handleTableLinkClick}
-                                menuID={menuID}
-                                editBtn={edit}
-                                setEditBtn={setEdit}
-                                handleSaveData={handleSaveData}
-                                reportData={reportData}
-                                onChangeInput={onChangeInput}
-                                promiseOptions={promiseOptions}
-                                dropDownArray={dropDownArray}
-                                onInputChange={onInputChange}
-                                loadingDropdown={loadingDropdown}
-                                defaultVisible={defaultVisible || searchLeadData?.defaultVisibleSearch}
-                                information={information}
-                                setReportData={setReportData}
-                                filename={filename}
-                              />
-                            </div> */}
-                              <div>
-                                <NewTablePage
-                                  title={"Record Table"}
-                                  columns={columnsSearchLead}
-                                  TableArray={searchLeadData?.tables || []}
-                                  tableFooter={searchLeadData?.tableWidth || []}
-                                  IsDetailPopupOpen={
-                                    searchLeadData?.isDetailPopupOpen || false
-                                  }
-                                  handleTableLinkClick={handleTableLinkClick}
-                                  menuID={menuID}
-                                  editBtn={edit}
-                                  setEditBtn={setEdit}
-                                  handleSaveData={handleDirectSave}
-                                  reportData={reportData}
-                                  onChangeInput={onChangeInput}
-                                  promiseOptions={promiseOptions}
-                                  dropDownArray={dropDownArray}
-                                  onInputChange={onInputChange}
-                                  loadingDropdown={loadingDropdown}
-                                  defaultVisible={
-                                    defaultVisible ||
-                                    searchLeadData?.defaultVisibleSearch
-                                  }
-                                  information={information}
-                                  filename={filename}
-                                  ischeckBoxReq={true} // Enable row selection if needed
-                                  tableFormatting={information?.tableFormatting}
-                                  orientation={information?.orientation}
-                                  headerRows={information?.headerRows}
-                                  footerRows={information?.footerRows}
-                                  tableheaderfooterCSS={
-                                    information?.tableheaderfooterCSS
-                                  }
-                                  tableBtnInfo={tableBtnInfo}
-                                  isFreezeHeader={
-                                    searchLeadData?.isFreezeHeader
-                                  }
-                                />
+
+                            {/* ── Table section: rendered in normal flow below the spacer div ── */}
+                            {isCardView ? (
+                              <div style={{ overflow: "auto" }}>
+                                {/* card view JSX unchanged */}
+                                <div
+                                  style={{
+                                    display: "grid",
+                                    gridTemplateColumns: `repeat(${cardViewData[0]?.Gridcnt ?? 1}, 1fr)`,
+                                    gap: "20px",
+                                    padding: "20px",
+                                  }}
+                                >
+                                  {cardViewData.map(
+                                    (data: any, dataIndex: number) =>
+                                      data?.tableArray?.map(
+                                        (response: any, index: number) => (
+                                          <Card
+                                            key={`${dataIndex}-${index}`}
+                                            style={{
+                                              height: data.Height
+                                                ? Number(
+                                                    data.Height.split("px")[0],
+                                                  ) + 20
+                                                : 200,
+                                              width: "100%",
+                                            }}
+                                          >
+                                            <CardHeader>
+                                              <CardTitle>
+                                                {data.FieldName}
+                                              </CardTitle>
+                                            </CardHeader>
+                                            <div
+                                              style={{
+                                                position: "relative",
+                                                width: "100%",
+                                                height: "100%",
+                                                backgroundColor: "white",
+                                              }}
+                                            >
+                                              {data?.cardFields?.map(
+                                                (res: any, i: number) => (
+                                                  <div
+                                                    key={i}
+                                                    style={{
+                                                      position: "absolute",
+                                                      top: `${res.CardColnum || res.Colnum || 0}px`,
+                                                      left: `${res.CardRownum || res.Rownum || 0}px`,
+                                                      height:
+                                                        res.CardHeight ||
+                                                        res.Height ||
+                                                        "auto",
+                                                      width:
+                                                        res.CardWidth ||
+                                                        res.Width ||
+                                                        "100%",
+                                                      padding: "2px",
+                                                    }}
+                                                  >
+                                                    {response[res.Colname] ||
+                                                      ""}
+                                                  </div>
+                                                ),
+                                              )}
+                                            </div>
+                                          </Card>
+                                        ),
+                                      ),
+                                  )}
+                                </div>
+                                {cardViewData.length === 0 && (
+                                  <div
+                                    style={{
+                                      textAlign: "center",
+                                      color: "#666",
+                                      marginTop: "40px",
+                                    }}
+                                  >
+                                    <h3>No card data available</h3>
+                                    <p>
+                                      Perform a search with card view
+                                      configuration
+                                    </p>
+                                  </div>
+                                )}
                               </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                            ) : (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "10px",
+                                }}
+                              >
+                                {isFileUpload && (
+                                  <ExcelUploadUtility
+                                    reportData={reportData}
+                                    token={token}
+                                  />
+                                )}
+                                {searchLeadData?.tables && (
+                                  <NewTablePage
+                                    title={"Record Table"}
+                                    columns={columnsSearchLead}
+                                    TableArray={searchLeadData?.tables || []}
+                                    tableFooter={
+                                      searchLeadData?.tableWidth || []
+                                    }
+                                    IsDetailPopupOpen={
+                                      searchLeadData?.isDetailPopupOpen || false
+                                    }
+                                    handleTableLinkClick={handleTableLinkClick}
+                                    menuID={menuID}
+                                    editBtn={edit}
+                                    setEditBtn={setEdit}
+                                    handleSaveData={handleDirectSave}
+                                    reportData={reportData}
+                                    onChangeInput={onChangeInput}
+                                    promiseOptions={promiseOptions}
+                                    dropDownArray={dropDownArray}
+                                    onInputChange={onInputChange}
+                                    loadingDropdown={loadingDropdown}
+                                    defaultVisible={
+                                      defaultVisible ||
+                                      searchLeadData?.defaultVisibleSearch
+                                    }
+                                    information={information}
+                                    filename={filename}
+                                    ischeckBoxReq={true}
+                                    tableFormatting={
+                                      information?.tableFormatting
+                                    }
+                                    orientation={information?.orientation}
+                                    headerRows={information?.headerRows}
+                                    footerRows={information?.footerRows}
+                                    tableheaderfooterCSS={
+                                      information?.tableheaderfooterCSS
+                                    }
+                                    tableBtnInfo={tableBtnInfo}
+                                    isFreezeHeader={
+                                      searchLeadData?.isFreezeHeader
+                                    }
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </SearchDropArea>
                   </CustomTabPanel>
                   {
