@@ -146,10 +146,6 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
   const [tabsState, setTabsState] = useState<AdvancedTab[]>(tabsProp);
   // useEffect(() => setTabsState(tabsProp), [tabsProp]);
   useEffect(() => {
-    const prevIds = tabsState.map((t) => t.id).join(",");
-    const nextIds = tabsProp.map((t) => t.id).join(",");
-    // Only do a full reset if tabs were added from outside (new ids appeared)
-    // Never reset if we only have fewer or reordered — those are internal mutations
     const prevSet = new Set(tabsState.map((t) => t.id));
     const nextHasNew = tabsProp.some((t) => !prevSet.has(t.id));
     if (nextHasNew) {
@@ -178,20 +174,23 @@ export function AdvancedTabs(props: AdvancedTabsProps) {
     }
   }, [controlledActiveId]);
 
+  // tabsState.length effect
   useEffect(() => {
     if (!activeId && tabsState[0]?.id) {
       setActiveId(tabsState[0].id);
     } else if (activeId && !tabsState.some((t) => t.id === activeId)) {
       setActiveId(tabsState[0]?.id ?? "");
+    } else {
+      console.log("AdvancedTabs tabsState");
     }
   }, [tabsState.length]);
 
   // Only notify parent when it's a USER action, not a prop sync
-  useEffect(() => {
-    if (activeId && isUserActionRef.current) {
-      onActiveChange?.(activeId);
-    }
-  }, [activeId, onActiveChange]);
+  // useEffect(() => {
+  //   if (activeId && isUserActionRef.current) {
+  //     onActiveChange?.(activeId);
+  //   }
+  // }, [activeId, onActiveChange]);
 
   useEffect(() => {
     if (!activeId && tabsState[0]?.id) {

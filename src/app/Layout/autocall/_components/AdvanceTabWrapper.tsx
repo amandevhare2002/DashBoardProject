@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, {
+  useMemo,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from "react";
 import { AdvancedTabs, AdvancedTab as IAdvancedTab } from "./AdvancedTabs";
 import { debounce } from "lodash";
 
@@ -64,11 +70,13 @@ export function DynamicAdvancedTabs({
     String(activeId),
   );
   const [processedTabs, setProcessedTabs] = useState<IAdvancedTab[]>([]);
+  const isExternalUpdateRef = useRef(false);
 
   // Update internal state when prop changes
   useEffect(() => {
     const stringActiveId = String(activeId);
     if (stringActiveId !== internalActiveId) {
+      isExternalUpdateRef.current = true; // ← mark as external
       setInternalActiveId(stringActiveId);
     }
   }, [activeId]);
